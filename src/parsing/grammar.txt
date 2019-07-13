@@ -1,0 +1,8 @@
+<program> ::= { <declaration> } EOF ;
+<declaration> ::= <varDecl> | <letBinding> | <statement>
+<varDecl> ::= "var" ID ( = <expr> )? ;
+<letBinding> ::= "let" ID = <expr> ;
+<statement> ::= <exprStmt> | <printStmt>
+<exprStmt> ::= <expr> ;
+<printStmt> ::= <expr>
+
