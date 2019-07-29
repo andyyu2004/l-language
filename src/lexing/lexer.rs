@@ -1,130 +1,215 @@
-use std::option::Option::{Some};
-use crate::lexing::token::TokenType;
-use itertools::{MultiPeek,multipeek};
-use std::str::Chars;
 use std::collections::HashMap;
+use std::option::Option::Some;
+
+use crate::errors::LError;
 use crate::lexing::Token;
-use crate::L;
+use crate::lexing::token::TokenType;
 
 pub struct Lexer {
+    xs: Vec<char>,
     keywords: HashMap<&'static str, TokenType>,
     line: i32,
-    col: i16
+    col: i16,
+    i: usize
 }
 
 impl Lexer {
-    pub fn new(keywords: HashMap<&'static str, TokenType>) -> Lexer {
-        Lexer { keywords, line: 0, col: 0 }
+    pub fn new(xs: String, keywords: HashMap<&'static str, TokenType>) -> Lexer {
+        Lexer { xs: xs.chars().collect(), keywords, line: 0, col: 0, i: 0 }
     }
 
-    pub(crate) fn lex(&mut self, xs: &str) -> Result<Vec<Token>, Vec<String>> {
-        let mut it = multipeek(xs.chars());
-        // Reset peek before and after due to multi peek
+    pub(crate) fn lex(&mut self) -> Result<Vec<Token>, Vec<LError>> {
         let mut tokens = Vec::<Token>::new();
-        let mut errors = Vec::<String>::new();
-        while let Some(&c) = it.peek() {
-            it.reset_peek();
+        let mut errors = Vec::<LError>::new();
+        while let Some(c) = self.safe_peek() {
             match c {
-                '\n' => {self.line += 1; self.col = 0 },
-                '\r' => self.col = 0,
+                '\n' => {self.line += 1; self.col = 0; self.i += 1; continue; },
+                '\t' => {self.col += 4; self.i += 1; continue; },
+                '\r' => {self.col = 0; self.i += 1; continue; },
                 ' ' => {},
-                '+' => tokens.push(self.create_token(TokenType::Plus)),
-                '-' => tokens.push(self.create_token(TokenType::Minus)),
-                '*' => tokens.push(self.create_token(TokenType::Star)),
-                '/' => tokens.push(self.create_token(TokenType::Slash)),
-                '^' => tokens.push(self.create_token(TokenType::Caret)),
-                '(' => tokens.push(self.create_token(TokenType::LParen)),
-                ')' => tokens.push(self.create_token(TokenType::RParen)),
-                '=' => tokens.push(self.create_token(TokenType::Equal)),
-                ';' => tokens.push(self.create_token(TokenType::Semicolon)),
+                ',' => tokens.push(self.create_token(TokenType::Comma, char::to_string(&c))),
+                ':' => tokens.push(self.create_token(TokenType::Colon, char::to_string(&c))),
+                '+' => tokens.push(self.create_token(TokenType::Plus, char::to_string(&c))),
+                '-' => if self.match_next('>') {
+                    tokens.push(self.create_token(TokenType::RightArrow, "->".to_string()));
+                    self.inc_indexes();
+                } else { tokens.push(self.create_token(TokenType::Minus, char::to_string(&c))) },
+                '*' => tokens.push(self.create_token(TokenType::Star, char::to_string(&c))),
+                '/' => tokens.push(self.create_token(TokenType::Slash, char::to_string(&c))),
+                '^' => tokens.push(self.create_token(TokenType::Caret, char::to_string(&c))),
+                '{' => tokens.push(self.create_token(TokenType::LBrace, char::to_string(&c))),
+                '}' => tokens.push(self.create_token(TokenType::RBrace, char::to_string(&c))),
+                '(' => tokens.push(self.create_token(TokenType::LParen, char::to_string(&c))),
+                ')' => tokens.push(self.create_token(TokenType::RParen, char::to_string(&c))),
+                ';' => tokens.push(self.create_token(TokenType::Semicolon, char::to_string(&c))),
+                '=' => if self.match_next('=') {
+                    tokens.push(self.create_token(TokenType::DoubleEqual, "==".to_string()));
+                    self.inc_indexes();
+                } else if self.match_next('>') {
+                    tokens.push(self.create_token(TokenType::RightFatArrow, "=>".to_string()));
+                    self.inc_indexes();
+                } else { tokens.push(self.create_token(TokenType::Equal, char::to_string(&c))); },
+                '<' => if self.match_next('=') {
+                    tokens.push(self.create_token(TokenType::LessEqual, "<=".to_string()));
+                    self.inc_indexes();
+                } else {
+                    tokens.push(self.create_token(TokenType::Less, char::to_string(&c)))
+                },
+                '>' => if self.match_next('=') {
+                    tokens.push(self.create_token(TokenType::GreaterEqual, ">=".to_string()));
+                    self.inc_indexes();
+                } else {
+                    tokens.push(self.create_token(TokenType::Greater, char::to_string(&c)))
+                },
+                '!' => if self.match_next('=') {
+                    tokens.push(self.create_token(TokenType::BangEqual, "!=".to_string()));
+                    self.inc_indexes();
+                } else {
+                    tokens.push(self.create_token(TokenType::Bang, char::to_string(&c)))
+                },
+
                 '0'...'9' => {
                     let start_col = self.col;
-                    let token = Token::new(TokenType::Number(self.lex_number(&mut it)), self.line, start_col);
+                    let num = self.lex_number();
+                    let token = Token::new(TokenType::Number, num, self.line, start_col);
                     tokens.push(token);
                     continue;
                 },
                 c if Lexer::is_identifier_start(c) => {
                     let start_col = self.col;
-                    let ttype = self.lex_identifier(&mut it);
-                    tokens.push(Token::new(ttype, self.line, start_col));
+                    let id = self.lex_identifier();
+                    if self.keywords.contains_key::<str>(&id) {
+                        let ttype = self.keywords.get::<str>(&id).unwrap();
+                        tokens.push(Token::new(*ttype, id, self.line, start_col));
+                    } else {
+                        tokens.push(Token::new(TokenType::Identifier, id, self.line, start_col))
+                    }
                     continue;
                 },
-                x => errors.push(L::error(format!("Unexpected character: {}", x), self.line, self.col)),
+                'A'...'Z' => {
+                    let start_col = self.col;
+                    let t = self.lex_type();
+                    tokens.push(Token::new(TokenType::Typename, t, self.line, start_col));
+                    continue;
+                },
+                x => errors.push(LError::new(format!("Unexpected character: {}", x), self.line, self.col)),
             }
-            it.next();
-            self.col += 1;
+            self.inc_indexes();
         }
-        tokens.push(self.create_token(TokenType::EOF));
+        tokens.push(self.create_token(TokenType::EOF, String::new()));
         // Declare accumulator locally to allow move out
-        if errors.is_empty() {
-            Ok(tokens)
-        } else {
-            Err(errors)
-        }
+        if errors.is_empty() { Ok(tokens) }
+        else { Err(errors) }
 
     }
 
-    fn create_token(&self, ttype: TokenType) -> Token {
+    fn create_token(&self, ttype: TokenType, lexeme: String) -> Token {
         Token {
             ttype,
+            lexeme,
             col: self.col,
             line: self.line
         }
     }
 
-    fn lex_identifier(&mut self, it: &mut MultiPeek<Chars>) -> TokenType {
-        // Know first character is correct
-        let mut acc = it.next().unwrap().to_string();
-        while let Some(&c) = it.peek() {
-            if !Lexer::is_identifier_char(c) { break }
-            acc.push(c);
-            it.next();
-        }
-
-        it.reset_peek();
-
-        self.col += acc.len() as i16;
-
-        match self.keywords.get::<str>(&acc) {
-            Some(&x) => x,
-            _ => TokenType::Identifier(Box::leak(acc.into_boxed_str()))
-        }
-
-//        if self.keywords.contains_key::<str>(&acc) {
-//            *self.keywords.get::<str>(&acc).unwrap()
-//        } else {
-//            Token::Identifier(Box::leak(acc.into_boxed_str()))
-//        }
-    }
-
-    fn lex_number(&mut self, it: &mut MultiPeek<Chars>) -> f64 {
+    fn lex_identifier(&mut self) -> String {
         let mut acc = String::new();
-        while let Some(&c) = it.peek() {
-            if c == '.' {
-                if let Some(&next) = it.peek() {
-                    if !next.is_numeric() {
-                        // Immediately return if non-number after dot
-                        break;
-                    }
-                }
-            }
-            if !c.is_numeric() && c != '.' { break }
-            acc.push(c);
-            it.next();
+        while !self.at_end() && self.peek().is_ascii_alphanumeric() {
+            acc.push(self.peek());
+            self.inc_indexes();
         }
-
-        it.reset_peek();
-        self.col += acc.len() as i16;
-        acc.parse::<f64>().expect("Failed to lex number")
+        acc
     }
 
+    fn lex_type(&mut self) -> String {
+        let mut acc = String::new();
+        while !self.at_end() && self.peek().is_ascii_alphabetic() {
+            acc.push(self.peek());
+            self.inc_indexes();
+        }
+        acc
+    }
+
+    fn lex_number(&mut self) -> String {
+        let mut acc = String::new();
+        while !self.at_end() && self.peek().is_numeric() {
+            acc.push(self.peek());
+            self.inc_indexes();
+        }
+        if self.match1('.') && self.peek().is_numeric() { // self.lookahead(1).map_or(false, |x| x.is_numeric()) {
+            acc.push(self.previous());
+            while !self.at_end() && self.peek().is_numeric() {
+                acc.push(self.peek());
+                self.inc_indexes();
+            }
+        }
+        acc
+
+
+    }
+
+}
+
+
+impl Lexer {
     // Utility
     fn is_identifier_start(c: char) -> bool {
         'a' <= c && c <= 'z' || c == '_'
     }
 
-    fn is_identifier_char(c: char) -> bool {
-        Lexer::is_identifier_start(c) || '0' <= c && c <= '9'
+//    fn is_identifier_char(c: char) -> bool {
+//        Lexer::is_identifier_start(c) || '0' <= c && c <= '9'
+//    }
+
+//    fn next(&mut self) -> Option<char> {
+//        let x = self.safe_peek();
+//        if x.is_some() {
+//            self.inc_indexes();
+//            x
+//        } else { None }
+//    }
+
+    fn match1(&mut self, c: char) -> bool {
+        if self.safe_peek().map_or(false, |x| x == c) {
+            self.inc_indexes();
+            true
+        } else { false }
+    }
+
+    // Does NOT increment
+    fn match_next(&mut self, c: char) -> bool {
+        self.lookahead(1).map_or(false, |x| x == c)
+    }
+
+//    fn prev(&self) -> char {
+//        self.xs[self.i - 1]
+//    }
+
+    fn at_end(&self) -> bool {
+        self.i >= self.xs.len()
+    }
+
+    fn inc_indexes(&mut self) {
+        self.i += 1;
+        self.col += 1;
+    }
+
+    fn peek(&self) -> char {
+        self.xs[self.i]
+    }
+
+    fn safe_peek(&self) -> Option<char> {
+        if self.i >= self.xs.len() { None }
+        else { Some(self.peek()) }
+    }
+
+    fn lookahead(&self, n: usize) -> Option<char> {
+        if self.i + n >= self.xs.len() { None }
+        else { Some(self.xs[self.i + n]) }
+    }
+
+    fn previous(&self) -> char {
+        self.xs[self.i - 1]
     }
 
 }

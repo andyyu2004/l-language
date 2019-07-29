@@ -7,11 +7,6 @@
       <sourceFolder url="file://$MODULE_DIR$/examples" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/tests" isTestSource="true" />
       <sourceFolder url="file://$MODULE_DIR$/benches" isTestSource="true" />
-      <sourceFolder url="file://$MODULE_DIR$/src/Lexing/src" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/src/Lexing/examples" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/src/Lexing/tests" isTestSource="true" />
-      <sourceFolder url="file://$MODULE_DIR$/src/Lexing/benches" isTestSource="true" />
-      <excludeFolder url="file://$MODULE_DIR$/src/Lexing/target" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />

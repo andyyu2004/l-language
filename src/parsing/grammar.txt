@@ -6,3 +6,9 @@
 <exprStmt> ::= <expr> ;
 <printStmt> ::= <expr>
 
+expressions
+...
+<unary> ::= "-" <unary> | <application>
+<application> ::= <primary> { ( <arguments>? ) }
+<arguments> ::= <expression> { , <expression> }
+

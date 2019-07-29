@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+
 use crate::lexing::TokenType;
 
 pub struct Keywords {
@@ -18,7 +19,10 @@ impl Keywords {
         hashmap![
             "var" => TokenType::Var,
             "let" => TokenType::Let,
-            "print" => TokenType::Print
+            "print" => TokenType::Print,
+            "true" => TokenType::True,
+            "false" => TokenType::False,
+            "fn" => TokenType::Fn
         ]
     }
 }

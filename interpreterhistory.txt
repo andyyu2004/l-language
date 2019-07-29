@@ -1,0 +1,100 @@
+2(2.5)
+2()()
+2()()()()()()
+2(2)(2)
+2(2)(2)(2)(2)(2)
+2.4
+2
+2.
+2..
+2..2
+2.2
+2(2.2)(2.4)
+2()()
+fn 
+fn test(t: Bool, s:bool)
+fn ->
+=>
+Bool
+Bool -> Bool
+Bool->Bool
+\x.
+fn Bool->Bool
+Bool
+fn (t: Bool)
+fn t(t: Bool)
+fn test(t:Bool)
+fn test(t:Bool->Bool)
+fn test(t:Bool->Bool->Bool)
+fn test(t:Bool->Bool->Bool->Int)
+fn test(t:Bool->Bool->Bool->Number)
+fn test(t: (Bool->Number) -> Bool)
+fn test(t: (Bool->Number) -> Bool -> Bool)
+fn test(t: (Bool->Number) -> (Bool -> Bool))
+fn test(t: (Bool->Number) -> (Bool -> Bool) -> Bool)
+fn test(t: Number -> Bool, f: Bool)
+fn test(t: Number -> Bool, f: Bool) -> Bool 
+fn test(t: Number -> Bool, f: Bool) -> Bool -> Bool 
+fn test(t: Number -> Bool, f: Bool) -> Bool -> Bool -> Bool
+fn test(t: Number -> Bool, f: Bool) -> (Bool -> Bool) -> Bool
+fn test(t: Number -> Bool, f: Bool) -> (Bool -> Bool) -> Bool {}
+fn test(t: Number -> Bool, f: Bool) -> (Bool -> Bool) -> Bool {
+fn test(t: Number -> Bool, f: Bool) -> (Bool -> Bool) -> Bool { let x = 5; }
+fn test(t: Number -> Bool, f: Bool) -> (Bool -> Bool) -> Bool { let x = 5;let y= 4; }
+test()
+fn test(t: Number -> Bool, f: Bool) -> (Bool -> Bool) -> Bool { let x = 5;let y= 4; }
+test()()
+test(2)()
+test(2)(55)
+test(2)(55).
+test(2)(55)
+2+5
+2+2
+false
+true
+2+2*5
+fn test(t: Number -> Bool, f: Bool) -> Bool -> Bool -> Bool
+fn test(t: Number -> Bool, f: Bool) -> Bool -> Bool -> Bool {}
+test(2)
+fn test(t: Number -> Bool, f: Bool) -> Bool -> Bool -> Bool {}
+test(2)
+fn test(t: Number -> Bool, f: Bool) -> Bool -> Bool -> Bool {}
+test(2)
+fn test(t: Number -> Bool, f: Bool) -> Bool -> Bool -> Bool {}
+test(2)
+fn test(t: Number -> Bool, f: Bool) -> Bool -> Bool -> Bool {}
+test(2)
+fn test(t: Number -> Bool, f: Bool) -> Bool -> Bool -> Bool {}
+test(2)
+fn test(t: Number -> Bool, f: Bool) -> Bool -> Bool -> Bool { 2+4; }
+test(2)
+fn test(t: Number -> Bool, f: Bool) -> Bool -> Bool -> Bool { 2+4; }
+fn test(t: Number -> Bool, f: Bool) -> Bool -> Bool -> Bool { 2+4 }
+test(2)
+fn test(t: Number -> Bool, f: Bool) -> Bool -> Bool -> Bool { 2+4 }
+test(2)
+fn test(t: Number -> Bool, f: Bool) -> Bool -> Bool -> Bool { 2+4 }
+test(2)
+fn test(t: Number -> Bool, f: Bool) -> Bool -> Bool -> Bool { 2+4 }
+test(2)
+test()
+test(22)
+fn test(t: Number -> Bool, f: Bool) -> Bool -> Bool -> Bool { t }
+test(22)
+test()
+test(22)
+test()
+t
+test()
+t
+fn test(t) { t }
+fn test(t:bool) { t }
+fn test(t:Bool) { t }
+test(3)
+test(5)
+test()
+test(5)
+fn test(t:Bool) { t }
+test(5)
+test()
+fn test(t:Bool) { t }

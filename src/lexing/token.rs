@@ -1,15 +1,17 @@
-use std::fmt::{Display, Formatter, Error};
+use std::fmt::{Display, Error, Formatter};
 
-#[derive(Debug, PartialEq, Copy, Clone)]
-pub struct  Token {
+#[derive(Debug, PartialEq, Clone)]
+pub struct Token {
     pub ttype: TokenType,
+    pub lexeme: String,
     pub line: i32,
     pub col: i16
 }
 
 impl Token {
-    pub fn new(ttype: TokenType, line: i32, col: i16) -> Token {
+    pub fn new(ttype: TokenType, lexeme: String, line: i32, col: i16) -> Token {
         Token {
+            lexeme,
             ttype,
             line,
             col,
@@ -23,23 +25,24 @@ impl Display for Token {
     }
 }
 
+// Don't associate values with tokentype, makes parsing more difficult, place data into lexeme field in Token type above
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum TokenType {
-    Plus,
-    Minus,
-    Star,
-    Slash,
-    Caret,
-    Number(f64),
-    RParen,
-    LParen,
+    Plus, Minus, Star, Slash, Caret, Number,
+    LParen, RParen, LBrace, RBrace,
     EOF,
-    Equal,
+    Equal, DoubleEqual, Less, Greater, LessEqual, GreaterEqual, Bang, BangEqual,
+    True, False,
     Semicolon,
     Var,
     Let,
     Print,
-    Identifier(&'static str)
+    Identifier,
+    Comma,
+    Colon,
+    Fn,
+    Typename,
+    RightArrow, RightFatArrow
 }
 
 

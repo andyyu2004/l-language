@@ -1,0 +1,13 @@
+fn test(f:Bool->Bool->Bool, g:Bool) -> Bool -> Bool {
+	let x = 4;
+	let y = 6;
+	x + y
+}
+
+fn test(t: Number -> Bool, f: Bool) -> Bool -> Bool -> Bool {
+    t
+    f
+    2+4
+}
+
+test(2,4)

@@ -1,8 +1,9 @@
 [package]
-name = "parse_test"
+name = "l"
 version = "0.1.0"
 authors = ["Andy Yu <andyyu2004@gmail.com>"]
 edition = "2018"
 
 [dependencies]
 itertools = "0.8.0"
+rustyline = "5.0.0"
