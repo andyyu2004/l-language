@@ -4,12 +4,14 @@ use crate::parsing::{Expr, Stmt};
 use crate::errors::LError;
 use crate::types::l_types::NameTypePair;
 use crate::types::LType;
-use crate::interpreting::l_object::LObject::{LBool, LString, LNumber, LFunction, LUnit};
+use crate::interpreting::l_object::LObject::{LBool, LString, LNumber, LFunction, LUnit, LTuple};
 use crate::interpreting::l_object::LObject;
 use itertools::Itertools;
+use crate::parsing::stmt::Stmt::{ExprStmt, PrintStmt, VarStmt, LetStmt, FnStmt, Curried};
+use crate::parsing::expr::Expr::{EUnary, ECurryApplication, EVariable, ELiteral, EBinary, ETuple};
 
 pub struct Interpreter {
-    pub env: Env
+    pub env: Env<Option<LObject>>
 }
 
 impl Interpreter {
@@ -36,11 +38,13 @@ impl Interpreter {
 
     fn execute(&mut self, statement: &Stmt) -> Result<(), LError> {
         match statement {
-            Stmt::ExprStmt(_expr) => Ok(()),
-            Stmt::PrintStmt(expr) => Ok(println!("{}", self.evaluate(expr)?)),
-            Stmt::Var(name, expr) => self.var_stmt(name, expr),
-            Stmt::Let(name, expr) => self.let_stmt(name, expr),
-            Stmt::Fn(name, args, ret, body) => self.execute_fn_decl(name, args, ret, body),
+            ExprStmt(expr) => { self.evaluate(expr)?; Ok(()) },
+            PrintStmt(expr) => Ok(println!("{}", self.evaluate(expr)?)),
+            VarStmt(name, _, expr) => self.var_stmt(name, expr),
+            LetStmt(name, _, expr) => self.let_stmt(name, expr),
+            FnStmt(name, token, args, ret, body) => self.execute_fn_decl(name, token, args, ret, body),
+            Curried(name, token, arg, ret) => self.execute_curried_fn_decl(name, token, arg, ret),
+//            CurriedFn(name, args, ret, body) => self.execute_fn_decl(name, args, ret, body),
             _ => Err(LError::new("Unknown statement type".to_string(), 0, 0))
         }
     }
@@ -58,16 +62,26 @@ impl Interpreter {
         Ok(self.env.define(name.lexeme.to_string(), value))
     }
 
-    fn execute_fn_decl(&mut self, name: &Token, args: &Vec<NameTypePair>, ret: &LType, body: &Vec<Stmt>) -> Result<(), LError> {
-        let lfunction = LFunction(Function::new(Stmt::Fn(name.clone(), args.clone(), ret.clone(), body.clone())));
-        self.env.define(name.lexeme.clone(), Some(lfunction));
+    fn execute_fn_decl(&mut self, name: &Option<String>, token: &Token, args: &Vec<NameTypePair>, ret: &LType, body: &Vec<Stmt>) -> Result<(), LError> {
+        let lfunction = LFunction(Function::new(Stmt::FnStmt(name.clone(), token.clone(), args.clone(), ret.clone(), body.clone()), self.env.clone()));
+        if let Some(name) = name {
+            self.env.define(name.clone(), Some(lfunction));
+        }
+        Ok(())
+    }
+
+    fn execute_curried_fn_decl(&mut self, name: &Option<String>, token: &Token, arg: &NameTypePair, ret: &Stmt) -> Result<(), LError> {
+        let lfunction = LFunction(Function::new(Curried(name.clone(), token.clone(), arg.clone(), Box::new(ret.clone())), self.env.clone()));
+        if let Some(name) = name {
+            self.env.define(name.clone(), Some(lfunction));
+        }
         Ok(())
     }
 
     // Ownership of self
-    pub fn execute_block(&mut self, statements: &Vec<Stmt>, env: Env) -> Result<(), LError> {
+    pub fn execute_block(&mut self, statements: &Vec<Stmt>, env: &Env<Option<LObject>>) -> Result<(), LError> {
         let enclosing = self.env.clone();
-        self.env = env;
+        self.env = env.clone();
         let errors = statements.
             iter().map(|x| self.execute(x)).
             filter(|x| x.is_err()).
@@ -108,7 +122,7 @@ impl Interpreter {
 
     pub fn evaluate(&mut self, expr: &Expr) -> Result<LObject, LError> {
         match expr {
-            Expr::Binary(op, left, ref right)  => match op.ttype {
+            EBinary(op, left, ref right)  => match op.ttype {
                 TokenType::Plus  => Ok(LNumber(self.evaluate(left)?.number() + self.evaluate(right)?.number())),
                 TokenType::Minus => Ok(LNumber(self.evaluate(left)?.number() - self.evaluate(right)?.number())),
                 TokenType::Star  => Ok(LNumber(self.evaluate(left)?.number() * self.evaluate(right)?.number())),
@@ -116,13 +130,15 @@ impl Interpreter {
                 TokenType::Caret => Ok(LNumber(f64::powf(self.evaluate(left)?.number(), self.evaluate(right)?.number()))),
                 _ => unreachable!()
             },
-            Expr::Unary(op, expr) => match op.ttype {
+            EUnary(op, expr) => match op.ttype {
                 TokenType::Minus => Ok(LNumber(-self.evaluate(expr)?.number())),
                 _ => unreachable!()
             },
-            Expr::Literal(token) => Ok(Interpreter::literal_to_l_object(token)),
-            Expr::Variable(name) => self.env.resolve(name),
-            Expr::Application(token, callee, args) => self.evaluate_application(token, callee, args),
+            ELiteral(token) => Ok(Interpreter::literal_to_l_object(token)),
+            EVariable(name) => self.env.resolve(name).map(|x| x.unwrap()),
+            ETuple(xs) => Ok(LTuple(xs.iter().map(|x| self.evaluate(x)).collect::<Result<Vec<LObject>, _>>()?)),
+            ECurryApplication(token, callee, arg) => self.evaluate_curried_application(token, callee, arg),
+//            Expr::EApplication(token, callee, args) => self.evaluate_application(token, callee, args),
             _ => Err(LError::new("Unknown expr type".to_string(), 0, 0))
         }
     }
@@ -136,17 +152,27 @@ impl Interpreter {
         }
     }
 
-    fn evaluate_application(&mut self, token: &Token, callee: &Expr, args: &Vec<Expr>) -> Result<LObject, LError> {
+    fn evaluate_curried_application(&mut self, token: &Token, callee: &Expr, arg: &Expr) -> Result<LObject, LError> {
         let callee_obj = self.evaluate(callee)?;
-        let mut arguments = Vec::<LObject>::new(); // Using explicit for loop as ? operator in closure is different
-        for arg in args { arguments.push(self.evaluate(arg)?) }
+        let arg_obj = self.evaluate(arg)?;
         if let LFunction(f) = callee_obj {
-            f.invoke(self, &arguments)?;
-            Ok(LUnit)
+            f.invoke(self, &arg_obj)
         } else {
-            Err(LError::from_token("Attempted to call a non function".to_string(), token))
+            Err(LError::from_token("Attempted invocation on non-function".to_string(), token))
         }
     }
+
+//    fn evaluate_application(&mut self, token: &Token, callee: &Expr, args: &Vec<Expr>) -> Result<LObject, LError> {
+//        let callee_obj = self.evaluate(callee)?;
+//        let mut arguments = Vec::<LObject>::new(); // Using explicit for loop as ? operator in closure is different
+//        for arg in args { arguments.push(self.evaluate(arg)?) }
+//        if let LFunction(f) = callee_obj {
+//            f.invoke(self, &arguments)?;
+//            Ok(LUnit)
+//        } else {
+//            Err(LError::from_token("Attempted to call a non function".to_string(), token))
+//        }
+//    }
 
 
 }

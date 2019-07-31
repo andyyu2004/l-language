@@ -1,100 +1,100 @@
-2(2.5)
-2()()
-2()()()()()()
-2(2)(2)
-2(2)(2)(2)(2)(2)
-2.4
-2
-2.
-2..
-2..2
-2.2
-2(2.2)(2.4)
-2()()
-fn 
-fn test(t: Bool, s:bool)
-fn ->
-=>
-Bool
-Bool -> Bool
-Bool->Bool
-\x.
-fn Bool->Bool
-Bool
-fn (t: Bool)
-fn t(t: Bool)
-fn test(t:Bool)
-fn test(t:Bool->Bool)
-fn test(t:Bool->Bool->Bool)
-fn test(t:Bool->Bool->Bool->Int)
-fn test(t:Bool->Bool->Bool->Number)
-fn test(t: (Bool->Number) -> Bool)
-fn test(t: (Bool->Number) -> Bool -> Bool)
-fn test(t: (Bool->Number) -> (Bool -> Bool))
-fn test(t: (Bool->Number) -> (Bool -> Bool) -> Bool)
-fn test(t: Number -> Bool, f: Bool)
-fn test(t: Number -> Bool, f: Bool) -> Bool 
-fn test(t: Number -> Bool, f: Bool) -> Bool -> Bool 
-fn test(t: Number -> Bool, f: Bool) -> Bool -> Bool -> Bool
-fn test(t: Number -> Bool, f: Bool) -> (Bool -> Bool) -> Bool
-fn test(t: Number -> Bool, f: Bool) -> (Bool -> Bool) -> Bool {}
-fn test(t: Number -> Bool, f: Bool) -> (Bool -> Bool) -> Bool {
-fn test(t: Number -> Bool, f: Bool) -> (Bool -> Bool) -> Bool { let x = 5; }
-fn test(t: Number -> Bool, f: Bool) -> (Bool -> Bool) -> Bool { let x = 5;let y= 4; }
-test()
-fn test(t: Number -> Bool, f: Bool) -> (Bool -> Bool) -> Bool { let x = 5;let y= 4; }
-test()()
-test(2)()
-test(2)(55)
-test(2)(55).
-test(2)(55)
-2+5
-2+2
-false
-true
-2+2*5
-fn test(t: Number -> Bool, f: Bool) -> Bool -> Bool -> Bool
-fn test(t: Number -> Bool, f: Bool) -> Bool -> Bool -> Bool {}
-test(2)
-fn test(t: Number -> Bool, f: Bool) -> Bool -> Bool -> Bool {}
-test(2)
-fn test(t: Number -> Bool, f: Bool) -> Bool -> Bool -> Bool {}
-test(2)
-fn test(t: Number -> Bool, f: Bool) -> Bool -> Bool -> Bool {}
-test(2)
-fn test(t: Number -> Bool, f: Bool) -> Bool -> Bool -> Bool {}
-test(2)
-fn test(t: Number -> Bool, f: Bool) -> Bool -> Bool -> Bool {}
-test(2)
-fn test(t: Number -> Bool, f: Bool) -> Bool -> Bool -> Bool { 2+4; }
-test(2)
-fn test(t: Number -> Bool, f: Bool) -> Bool -> Bool -> Bool { 2+4; }
-fn test(t: Number -> Bool, f: Bool) -> Bool -> Bool -> Bool { 2+4 }
-test(2)
-fn test(t: Number -> Bool, f: Bool) -> Bool -> Bool -> Bool { 2+4 }
-test(2)
-fn test(t: Number -> Bool, f: Bool) -> Bool -> Bool -> Bool { 2+4 }
-test(2)
-fn test(t: Number -> Bool, f: Bool) -> Bool -> Bool -> Bool { 2+4 }
-test(2)
-test()
-test(22)
-fn test(t: Number -> Bool, f: Bool) -> Bool -> Bool -> Bool { t }
-test(22)
-test()
-test(22)
-test()
-t
-test()
-t
-fn test(t) { t }
-fn test(t:bool) { t }
-fn test(t:Bool) { t }
-test(3)
-test(5)
-test()
-test(5)
-fn test(t:Bool) { t }
-test(5)
-test()
-fn test(t:Bool) { t }
+a (3, 5)
+2_5
+2_
+fn a(x: Int, y:Int) -> Bool {}
+fn f = x:Int => y:Int : Bool {}
+fn f = x:Int => y:Int => z:Bool  : Bool {}
+fn f = x:Int => y:Int => z:(Bool -> Bool, Int)  : Bool {}
+fn f = x:Int => y:Int => z:(Bool -> Bool, Int) : Bool {}
+f(3)
+fn f = x:Int => y:Int => z:(Bool -> Bool, Int) : Bool {}
+f
+f 3
+f 2
+f 2 4
+f 2 4 
+f 2 false 
+fn f = x:Int => y:Int => z:(Bool -> Bool, Int) : Bool {}
+f
+fn f = x:Int => y:Int => z:(Bool -> Bool, Int) : Bool {}
+f
+f 3
+f 3 5
+fn f() {2+2}
+f
+f()
+fn f() {2+2}
+fn f(p: Int) {2+2+p}
+f()
+f(2)
+fn f() {2+2}
+f()
+fn f() {2+2}
+fn f() {2+2+p}
+fn g(x: Int) {x}
+f(2)
+fn g(x: Int) {x}
+g(3)
+fn g(x: Int) {x}
+g(3)
+fn g(x: Int) {x}
+g(3)
+fn g(x: Int) {x}
+g(3)
+fn g(x: Int, y:Int) {x+y}
+g(3)
+g(3,4)
+g(3)
+fn g(x: Int) {x}
+g(3)
+fn g(x: Int, y:Int) {x+y}
+g(3,4)
+g(3)
+g 3
+fn g(x: Int) {x}
+g 4
+fn g(x: Int) {x}
+g 4
+g(4)
+fn g(x: Int) {x}
+g(2)
+fn g(x: Int) {x}
+g(2)
+fn c = x: Int => y: Int : Int {x+y}
+c 4
+c 4 6
+fn c = x: Int => y: Int : Int {x+y}
+c 4 6
+c 4
+fn c = x: Int => y: Int : Int {x+y}
+c 4
+c 4 7
+fn c = x: Int => y: Int : Int {x+y}
+c 4 7
+fn c = x: Int => y: Int : Int {x+y}
+c 4 7
+fn c = x: Int => y: Int : Int {x+y}
+c 4 7
+fn c = x: Int => y: Int : Int {x+y}
+c 4 7
+fn curried = a: Int => b: Int : Int {}
+curried 5
+curried 5 5
+// f
+//
+fn curried = a: Int => b: Int : Int { a + b }
+fn higherOrder(f: Int -> Int -> Int) -> Unit { f 3 6 }
+fn curried = a: Int => b: Int : Int { a + b }
+fn higherOrder(f: Int -> Int -> Int) -> Unit { f 3 6 }
+fn curried = a: Int => b: Int : Int { a + b }
+higherOrder curried
+fn curried = a: Int => b: Int : Int { a + b }
+fn higherOrder(f: Int -> Int -> Int) -> Unit { f 3 6 }
+fn curried = a: Int => b: Int : Int { a + b }
+fn higherOrder(f: Int -> Int -> Int) -> Unit { f 3 6 }
+curried 6 4
+higherOrder curried
+//
+///
+/////
+// dsfsfsfglll fn

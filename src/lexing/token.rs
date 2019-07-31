@@ -1,6 +1,6 @@
 use std::fmt::{Display, Error, Formatter};
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Eq)]
 pub struct Token {
     pub ttype: TokenType,
     pub lexeme: String,
@@ -26,7 +26,7 @@ impl Display for Token {
 }
 
 // Don't associate values with tokentype, makes parsing more difficult, place data into lexeme field in Token type above
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum TokenType {
     Plus, Minus, Star, Slash, Caret, Number,
     LParen, RParen, LBrace, RBrace,

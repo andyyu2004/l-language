@@ -15,7 +15,7 @@ pub struct Lexer {
 
 impl Lexer {
     pub fn new(xs: String, keywords: HashMap<&'static str, TokenType>) -> Lexer {
-        Lexer { xs: xs.chars().collect(), keywords, line: 0, col: 0, i: 0 }
+        Lexer { xs: xs.chars().collect(), keywords, line: 1, col: 0, i: 0 }
     }
 
     pub(crate) fn lex(&mut self) -> Result<Vec<Token>, Vec<LError>> {
@@ -35,13 +35,19 @@ impl Lexer {
                     self.inc_indexes();
                 } else { tokens.push(self.create_token(TokenType::Minus, char::to_string(&c))) },
                 '*' => tokens.push(self.create_token(TokenType::Star, char::to_string(&c))),
-                '/' => tokens.push(self.create_token(TokenType::Slash, char::to_string(&c))),
                 '^' => tokens.push(self.create_token(TokenType::Caret, char::to_string(&c))),
                 '{' => tokens.push(self.create_token(TokenType::LBrace, char::to_string(&c))),
                 '}' => tokens.push(self.create_token(TokenType::RBrace, char::to_string(&c))),
                 '(' => tokens.push(self.create_token(TokenType::LParen, char::to_string(&c))),
                 ')' => tokens.push(self.create_token(TokenType::RParen, char::to_string(&c))),
                 ';' => tokens.push(self.create_token(TokenType::Semicolon, char::to_string(&c))),
+                '/' => if self.match_next('/') {
+                    while !self.at_end() && self.peek() != '\n' { self.inc_indexes(); continue; }
+                } else if self.match_next('*') {
+
+                } else {
+                    tokens.push(self.create_token(TokenType::Slash, char::to_string(&c)))
+                },
                 '=' => if self.match_next('=') {
                     tokens.push(self.create_token(TokenType::DoubleEqual, "==".to_string()));
                     self.inc_indexes();
@@ -67,7 +73,6 @@ impl Lexer {
                 } else {
                     tokens.push(self.create_token(TokenType::Bang, char::to_string(&c)))
                 },
-
                 '0'...'9' => {
                     let start_col = self.col;
                     let num = self.lex_number();
@@ -114,7 +119,7 @@ impl Lexer {
 
     fn lex_identifier(&mut self) -> String {
         let mut acc = String::new();
-        while !self.at_end() && self.peek().is_ascii_alphanumeric() {
+        while !self.at_end() && Lexer::is_identifier_char(self.peek()) {
             acc.push(self.peek());
             self.inc_indexes();
         }
@@ -157,9 +162,9 @@ impl Lexer {
         'a' <= c && c <= 'z' || c == '_'
     }
 
-//    fn is_identifier_char(c: char) -> bool {
-//        Lexer::is_identifier_start(c) || '0' <= c && c <= '9'
-//    }
+    fn is_identifier_char(c: char) -> bool {
+        Lexer::is_identifier_start(c) || '0' <= c && c <= '9' || 'A' <= c && c <= 'Z' || c == '\''
+    }
 
 //    fn next(&mut self) -> Option<char> {
 //        let x = self.safe_peek();

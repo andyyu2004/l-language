@@ -1,17 +1,16 @@
 use std::collections::HashMap;
 use crate::errors::LError;
 use crate::lexing::Token;
-use crate::interpreting::l_object::LObject;
-
 
 #[derive(Debug, Clone)]
-pub struct Env {
-    vars: HashMap<String, Option<LObject>>,
-    outer: Box<Option<Env>>
+pub struct Env<T> where T : Clone {
+    vars: HashMap<String, T>,
+    outer: Box<Option<Env<T>>>
 }
 
-impl Env {
-    pub fn new(outer: Option<Env>) -> Env {
+impl<T> Env<T> where T : Clone {
+
+    pub fn new(outer: Option<Env<T>>) -> Env<T> {
         Env { vars: HashMap::new() , outer: Box::new(outer) }
     }
 
@@ -20,18 +19,22 @@ impl Env {
     // If the map did have this key present, the value is updated, and the old value is returned
 
     // Allows redefinition without warning
-    pub fn define(&mut self, key: String, value: Option<LObject>) {
+    pub fn define(&mut self, key: String, value: T) {
         self.vars.insert(key, value);
     }
 
-    pub fn resolve(&self, key: &Token) -> Result<LObject, LError> {
+    // Climb the cactus stack to resolve bindings
+    pub fn resolve(&self, key: &Token) -> Result<T, LError> {
         match self.vars.get(&key.lexeme) {
-            Some(x) => match x {
-                Some(obj) => Ok(obj.clone()),
-                None => Err(LError::from_token(format!("Uninitialized variable '{}'", key.lexeme), key))
-            },
-            None => Err(LError::from_token(format!("Undefined variable '{}'", key.lexeme), key))
+            Some(x) => Ok(x.clone()),
+            None => match *self.outer {
+                Some(ref env) => env.resolve(key),
+                None => Err(LError::from_token(format!("Undefined variable '{}'", key.lexeme), key))
+            }
         }
+    }
 
+    pub fn resolve_str(&self, key: &str) -> Option<&T> {
+        self.vars.get(key)
     }
 }

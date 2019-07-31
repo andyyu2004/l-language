@@ -5,7 +5,6 @@ use lexing::{Keywords, Lexer};
 use parsing::Parser;
 
 use crate::interpreting::Interpreter;
-//use crate::types::type_checker::type_check;
 
 mod parsing;
 mod lexing;
@@ -14,28 +13,35 @@ mod interpreting;
 mod errors;
 mod types;
 mod internal;
+mod static_analysis;
 
 use std::{env, fs, process};
+use crate::types::type_checker::TypeChecker;
+use crate::static_analysis::Analyser;
+
 
 fn main() {
 
     let args = env::args().collect::<Vec<String>>();
-    let mut interpreter = Interpreter::new();
 
     if args.len() == 2 {
         let path = &args[1];
         match fs::read_to_string(path) {
-            Err(err) => println!("{}", err),
-            Ok(contents) => execute(contents, &mut interpreter)
+            Err(err) => eprintln!("{}", err),
+            Ok(contents) => execute(contents)
         }
         process::exit(0)
     } else if args.len() != 1 {
-        println!("Invalid args");
+        eprintln!("Invalid args");
         process::exit(1);
     }
 
     let mut rl = Editor::<()>::new();
     if rl.load_history("interpreterhistory.txt").is_err() {}
+
+    let mut analyser = Analyser::new();
+    let mut typechecker = TypeChecker::new();
+    let mut interpreter = Interpreter::new();
 
 
     loop {
@@ -44,11 +50,19 @@ fn main() {
             Ok (ref line) if line == ":e" => {
                 println!("{:#?}", interpreter.env);
                 continue;
-            }
+            },
+            Ok(ref line) if line.starts_with(":t") => {
+                let var = &line[3..].trim_start();
+                match typechecker.get_type(var) {
+                    Some(t) => println!("{}", t),
+                    None => eprintln!("Undefined variable")
+                }
+                continue;
+            },
             Ok(line) => {
                 rl.add_history_entry(line.as_str());
                 if rl.save_history("interpreterhistory.txt").is_err() {
-                    println!("Failed to save history");
+                    eprintln!("Failed to save history");
                 }
                 line
             }
@@ -65,12 +79,13 @@ fn main() {
             }
         };
 
+
         let mut lexer = Lexer::new(input, Keywords::map());
         let tokens = match lexer.lex() {
             Ok(x) => x,
             Err(errors) => {
                 println!("Lex Error: ");
-                errors.iter().for_each(|x| println!("{}", x));
+                errors.iter().for_each(|x| eprintln!("{}", x));
                 continue
             },
         };
@@ -83,7 +98,7 @@ fn main() {
             Ok(x) => x,
             Err(errors) => {
                 println!("Parse Error: ");
-                errors.iter().for_each(|x| println!("{}", x));
+                errors.iter().for_each(|x| eprintln!("{}", x));
                 continue;
             }
         };
@@ -93,17 +108,23 @@ fn main() {
 
         statements.iter().for_each(|x| println!("{}", x));
 
-//        if let Err(err) = type_check(statements) {
-//            err.iter().for_each(|e| println!("{:?}", e));
-//            continue;
-//        }
+        if let Err(err) = analyser.analyse(&statements) {
+            eprintln!("Error in static analyser");
+            err.iter().for_each(|e| eprintln!("{}", e));
+            continue;
+        }
+
+        if let Err(err) = typechecker.type_check(&statements) {
+            eprintln!("Typecheck error");
+            err.iter().for_each(|e| eprintln!("{}", e));
+            continue;
+        }
 
 
         if let Err(errors) = interpreter.interpret(&statements) {
             println!("Interpreter Error: ");
-            errors.iter().for_each(|x| println!("{}", x));
+            errors.iter().for_each(|x| eprintln!("{}", x));
         }
-
 
 
         // Parse Expressions only
@@ -125,12 +146,20 @@ fn main() {
 
 }
 
-fn execute(input: String, interpreter: &mut Interpreter) {
+// Can't bring upper functionality into function as requires break and continue
+fn execute(input: String) {
+
+    let mut analyser = Analyser::new();
+    let mut typechecker = TypeChecker::new();
+    let mut interpreter = Interpreter::new();
+
     let mut lexer = Lexer::new(input, Keywords::map());
+
     let tokens = match lexer.lex() {
         Ok(t) => t,
-        Err(e) => {
-            println!("{:?}", e);
+        Err(errors) => {
+            println!("Lex Error: ");
+            errors.iter().for_each(|x| eprintln!("{}", x));
             process::exit(1);
         }
     };
@@ -138,13 +167,31 @@ fn execute(input: String, interpreter: &mut Interpreter) {
     let mut parser = Parser::new(tokens);
     let statements = match parser.parse() {
         Ok(s) => s,
-        Err(e) => {
-            println!("{:?}", e);
+        Err(errors) => {
+            println!("Parse Error: ");
+            errors.iter().for_each(|x| eprintln!("{}", x));
             process::exit(1);
         }
     };
 
-    statements.iter().for_each(|x| println!("{}", x));
+    if let Err(err) = analyser.analyse(&statements) {
+        eprintln!("Error in static analyser");
+        err.iter().for_each(|e| eprintln!("{}", e));
+        process::exit(1)
+    }
+
+    if let Err(err) = typechecker.type_check(&statements) {
+        eprintln!("Typecheck error");
+        err.iter().for_each(|e| eprintln!("{}", e));
+        process::exit(1)
+    }
+
+
+    if let Err(errors) = interpreter.interpret(&statements) {
+        println!("Interpreter Error: ");
+        errors.iter().for_each(|x| eprintln!("{}", x));
+        process::exit(1)
+    }
 
 }
 
