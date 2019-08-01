@@ -22,7 +22,8 @@ impl Keywords {
             "print" => TokenType::Print,
             "true" => TokenType::True,
             "false" => TokenType::False,
-            "fn" => TokenType::Fn
+            "fn" => TokenType::Fn,
+            "return" => TokenType::Return
         ]
     }
 }

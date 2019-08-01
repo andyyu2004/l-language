@@ -1,10 +1,11 @@
 <program> ::= { <declaration> } EOF ;
 <declaration> ::= <varDecl> | <letBinding> | <statement>
+<statement> ::= <exprStmt> | <printStmt> | <block>
 <varDecl> ::= "var" ID ( = <expr> )? ;
+
 <letBinding> ::= "let" ID = <expr> ;
-<statement> ::= <exprStmt> | <printStmt>
 <exprStmt> ::= <expr> ;
-<printStmt> ::= <expr>
+<printStmt> ::= <expr> !?
 
 expressions
 ...

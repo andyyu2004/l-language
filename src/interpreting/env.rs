@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use crate::errors::LError;
 use crate::lexing::Token;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Env<T> where T : Clone {
     vars: HashMap<String, T>,
     outer: Box<Option<Env<T>>>
@@ -21,6 +21,21 @@ impl<T> Env<T> where T : Clone {
     // Allows redefinition without warning
     pub fn define(&mut self, key: String, value: T) {
         self.vars.insert(key, value);
+    }
+
+    // Assignment validity is checked by static analysis
+    pub fn update(&mut self, key: &String, value: T) {
+        match self.vars.get(key) {
+            Some(x) => { self.vars.insert(key.to_string(), value); },
+            None => match *self.outer {
+                Some(ref mut env) => env.update(key, value),
+                None => panic!("Failed in env update, var not found in any scope")
+            }
+        };
+    }
+
+    pub fn enclosing(&self) -> &Option<Env<T>> {
+        &*self.outer
     }
 
     // Climb the cactus stack to resolve bindings

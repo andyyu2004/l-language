@@ -49,7 +49,7 @@ impl PartialEq for LType {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct NameTypePair {
     pub name: String,
     pub ltype: LType

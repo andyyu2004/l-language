@@ -5,17 +5,18 @@ use crate::types::LType;
 use crate::lexing::Token;
 use itertools::join;
 use crate::types::l_types::NameTypePair;
-use crate::parsing::stmt::Stmt::{ExprStmt, PrintStmt, VarStmt, FnStmt, LetStmt, Curried};
+use crate::parsing::stmt::Stmt::{ExprStmt, PrintStmt, VarStmt, FnStmt, LetStmt, FnCurried, BlockStmt, ReturnStmt};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
     ExprStmt(Expr),
     PrintStmt(Expr),
-    VarStmt(Token, LType, Option<Expr>),
-    LetStmt(Token, LType, Expr),
-    FnStmt(Option<String>, Token, Vec<NameTypePair>, LType, Vec<Stmt>), // Not all functions are named
-//    CurriedFn(Token, Vec<NameTypePair>, LType, Vec<Stmt>),
-    Curried(Option<String>, Token, NameTypePair, Box<Stmt>) // Name, Some relevant token, param:type pair, return
+    BlockStmt(Vec<Stmt>),
+    ReturnStmt { token: Token, value: Option<Expr> },
+    VarStmt { name: Token, ltype: LType, init: Option<Expr> },
+    LetStmt { name: Token, ltype: LType, init: Expr },
+    FnStmt { name: Option<String>, token: Token, params: Vec<NameTypePair>, ret_type: LType, body: Vec<Stmt> },
+    FnCurried { name: Option<String>, token: Token, param: NameTypePair, ret: Box<Stmt> } // Name, Some relevant token, param:type pair, return
 }
 
 impl Display for Stmt {
@@ -23,17 +24,22 @@ impl Display for Stmt {
         match self {
             ExprStmt(expr) => write!(f, "ExprStmt(\n\t{}\n)", expr),
             PrintStmt(expr) => write!(f, "Print(\n\t{}\n)", expr),
-            VarStmt(name, ltype, Some(expr)) => write!(f, "var {}: {} <- {}", name.lexeme, ltype, expr),
-            VarStmt(name, ltype, None) => write!(f, "var {}: {}", name.lexeme, ltype),
-            LetStmt(name, ltype, expr) => write!(f, "var {}: {} <- {})", name.lexeme, ltype, expr),
+            VarStmt { name, ltype, init } if init.is_some() => write!(f, "var {}: {} <- {}", name.lexeme, ltype, init.as_ref().unwrap()),
+            VarStmt { name, ltype, .. } => write!(f, "var {}: {}", name.lexeme, ltype),
+            BlockStmt(xs) => write!(f, "{{{}}}", format_block(xs)),
+            LetStmt { name, ltype, init } => write!(f, "var {}: {} <- {})", name.lexeme, ltype, init),
 //            CurriedFn(, name, params, ret, body) => write!(f, "fn {} = {} : {} {{\n{}}}", name.lexeme, format_args(params, " => "), ret, format_block(body)),
-            FnStmt(name, _, params, ret, body) => match name {
-                Some(name) => write!(f, "fn {} ({}) -> {} {{\n{}}}", name, format_args(params, ", "), ret, format_block(body)),
-                None => write!(f, "fn ({}) -> {} {{\n{}}}", format_args(params, ", "), ret, format_block(body)),
+            FnStmt { name, params, ret_type, body, .. } => match name {
+                Some(name) => write!(f, "fn {} ({}) -> {} {{\n{}}}", name, format_args(params, ", "), ret_type, format_block(body)),
+                None => write!(f, "fn ({}) -> {} {{\n{}}}", format_args(params, ", "), ret_type, format_block(body)),
             }
-            Curried(name, _, nt, ret) => match name {
-                Some(name) => write!(f, "cfn {} {} => {}", name, nt, ret),
-                None => write!(f, "cfn {} => {}", nt, ret)
+            FnCurried { name, param, ret, .. } => match name {
+                Some(name) => write!(f, "cfn {} {} => {}", name, param, ret),
+                None => write!(f, "cfn {} => {}", param, ret)
+            },
+            ReturnStmt { value, .. } => match value {
+                Some(value) => write!(f, "return {};", value),
+                None => write!(f, "return;")
             }
         }
     }

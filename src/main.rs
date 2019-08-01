@@ -4,7 +4,7 @@ use rustyline::error::ReadlineError;
 use lexing::{Keywords, Lexer};
 use parsing::Parser;
 
-use crate::interpreting::Interpreter;
+use crate::interpreting::{Interpreter, LObject, Env};
 
 mod parsing;
 mod lexing;
@@ -18,6 +18,7 @@ mod static_analysis;
 use std::{env, fs, process};
 use crate::types::type_checker::TypeChecker;
 use crate::static_analysis::Analyser;
+use crate::parsing::ParseMode;
 
 
 fn main() {
@@ -41,6 +42,7 @@ fn main() {
 
     let mut analyser = Analyser::new();
     let mut typechecker = TypeChecker::new();
+//    let mut env = Env::new(None);
     let mut interpreter = Interpreter::new();
 
 
@@ -48,6 +50,10 @@ fn main() {
         let input = match rl.readline("\\>>: ") {
             Ok(ref line) if line.is_empty() => { continue; }
             Ok (ref line) if line == ":e" => {
+                rl.add_history_entry(line.as_str());
+                if rl.save_history("interpreterhistory.txt").is_err() {
+                    eprintln!("Failed to save history");
+                }
                 println!("{:#?}", interpreter.env);
                 continue;
             },
@@ -92,7 +98,7 @@ fn main() {
 
 //        println!("{:#?}", tokens);
 
-        let mut parser = Parser::new(tokens);
+        let mut parser = Parser::new(tokens, ParseMode::Interactive);
 
         let statements = match parser.parse() {
             Ok(x) => x,
@@ -121,7 +127,7 @@ fn main() {
         }
 
 
-        if let Err(errors) = interpreter.interpret(&statements) {
+        if let Err(errors) = interpreter.interpret(statements) {
             println!("Interpreter Error: ");
             errors.iter().for_each(|x| eprintln!("{}", x));
         }
@@ -151,6 +157,7 @@ fn execute(input: String) {
 
     let mut analyser = Analyser::new();
     let mut typechecker = TypeChecker::new();
+//    let mut env = Env::new(None);
     let mut interpreter = Interpreter::new();
 
     let mut lexer = Lexer::new(input, Keywords::map());
@@ -164,7 +171,7 @@ fn execute(input: String) {
         }
     };
 
-    let mut parser = Parser::new(tokens);
+    let mut parser = Parser::new(tokens, ParseMode::Interpreted);
     let statements = match parser.parse() {
         Ok(s) => s,
         Err(errors) => {
@@ -180,14 +187,14 @@ fn execute(input: String) {
         process::exit(1)
     }
 
-    if let Err(err) = typechecker.type_check(&statements) {
-        eprintln!("Typecheck error");
-        err.iter().for_each(|e| eprintln!("{}", e));
-        process::exit(1)
-    }
+//    if let Err(err) = typechecker.type_check(&statements) {
+//        eprintln!("Typecheck error");
+//        err.iter().for_each(|e| eprintln!("{}", e));
+//        process::exit(1)
+//    }
 
 
-    if let Err(errors) = interpreter.interpret(&statements) {
+    if let Err(errors) = interpreter.interpret(statements) {
         println!("Interpreter Error: ");
         errors.iter().for_each(|x| eprintln!("{}", x));
         process::exit(1)

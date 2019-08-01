@@ -2,29 +2,29 @@ use std::fmt::{Display, Error, Formatter};
 
 use crate::lexing::Token;
 use itertools::join;
-use crate::parsing::expr::Expr::{EBinary, EUnary, EVariable, ELiteral, ETuple, ECurryApplication};
+use crate::parsing::expr::Expr::{EBinary, EUnary, EVariable, ELiteral, ETuple, EApplication, EAssignment};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
-    EBinary(Token, Box<Expr>, Box<Expr>),
-    EUnary(Token, Box<Expr>),
-    EVariable(Token),
+    EBinary { operator: Token, left: Box<Expr>, right: Box<Expr> },
+    EUnary { operator: Token, operand: Box<Expr> },
+    EVariable { name: Token },
+    EAssignment { lvalue: Token, expr: Box<Expr> },
     ELiteral(Token),
-//    EApplication(Token, Box<Expr>, Vec<Expr>),
-    ECurryApplication(Token, Box<Expr>, Box<Expr>),
+    EApplication { token: Token, callee: Box<Expr>, arg: Box<Expr> }, // Curried
     ETuple(Vec<Expr>),
 }
 
 impl Display for Expr {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         match self {
-            EBinary(op, l, r) => write!(f, "{}{{{}}}{{{}}}", op.lexeme, l, r),
-            EUnary(op, expr) => write!(f, "{}{{{}}}", op.lexeme, expr),
-            EVariable(var) => write!(f, "var {}", var.lexeme),
+            EBinary { operator, left, right } => write!(f, "{}{{{}}}{{{}}}", operator.lexeme, left, right),
+            EUnary { operator, operand } => write!(f, "{}{{{}}}", operator.lexeme, operand),
+            EVariable { name } => write!(f, "var {}", name.lexeme),
             ELiteral(x) => write!(f, "{}", x.lexeme),
             ETuple(xs) => write!(f, "({})", format_tuple(xs)),
-//            EApplication(_, callee, args) => write!(f, "{}({})", callee, format_tuple(args)),
-            ECurryApplication(_, callee, arg) => write!(f, "{} {}", callee, arg),
+            EAssignment { lvalue, expr} => write!(f, "{} = {}", lvalue, expr),
+            EApplication { callee, arg, .. } => write!(f, "{} {}", callee, arg),
 //            x => write!(f, "{:?}", x)
         }
     }

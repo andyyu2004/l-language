@@ -3,6 +3,7 @@
 #[derive(Debug, Copy, Clone)]
 pub enum StaticInfo {
     IVariable(bool), // is_initialised
-    IFunction(), // arity
-    ILetBinding(),
+    IFunction, // arity
+    ILetBinding,
+    IEmpty
 }

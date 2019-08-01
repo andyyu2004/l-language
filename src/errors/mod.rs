@@ -11,7 +11,11 @@ pub struct LError {
 
 impl Display for LError {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(f, "{}:{}: {} (token:{:?})", self.line, self.col, self.message, self.token)
+        match &self.token {
+            Some(t) => write!(f, "{}:{}: {} (token{{{}}})", self.line, self.col, self.message, t),
+            None => write!(f, "{}:{}: {}", self.line, self.col, self.message)
+        }
+
     }
 }
 

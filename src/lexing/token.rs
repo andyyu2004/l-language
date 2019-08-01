@@ -21,7 +21,7 @@ impl Token {
 
 impl Display for Token {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(f, "{}", self.ttype)
+        write!(f, "{} of {} at {}:{}", self.lexeme, self.ttype, self.line, self.col)
     }
 }
 
@@ -42,6 +42,7 @@ pub enum TokenType {
     Colon,
     Fn,
     Typename,
+    Return,
     RightArrow, RightFatArrow
 }
 

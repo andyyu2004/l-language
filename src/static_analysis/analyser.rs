@@ -1,10 +1,13 @@
 use crate::parsing::{Stmt, Expr};
 use crate::errors::LError;
-use crate::parsing::stmt::Stmt::{PrintStmt, ExprStmt, VarStmt, LetStmt, FnStmt, Curried};
+use crate::parsing::stmt::Stmt::{PrintStmt, ExprStmt, VarStmt, LetStmt, FnStmt, FnCurried, BlockStmt, ReturnStmt};
 use crate::interpreting::{Env};
-use crate::parsing::expr::Expr::{EVariable, ECurryApplication};
+use crate::parsing::expr::Expr::{EVariable, EApplication, EAssignment};
 use crate::static_analysis::StaticInfo;
-use crate::static_analysis::static_info::StaticInfo::{IVariable, ILetBinding, IFunction};
+use crate::static_analysis::static_info::StaticInfo::{IVariable, ILetBinding, IFunction, IEmpty};
+use crate::lexing::Token;
+use std::process::exit;
+use std::borrow::Borrow;
 
 // Check validity of code
 // Unintialized and undefined variables
@@ -20,6 +23,7 @@ impl Analyser {
 }
 
 impl Analyser {
+
     pub fn analyse(&mut self, statements: &Vec<Stmt>) -> Result<(), Vec<LError> >{
         let mut errors = Vec::<LError>::new();
         for stmt in statements {
@@ -31,39 +35,81 @@ impl Analyser {
         else { Err(errors) }
     }
 
-    fn analyse_stmt(&mut self, stmt: &Stmt) -> Result<(), LError> {
+    fn analyse_stmt(&mut self, stmt: &Stmt) -> Result<StaticInfo, LError> {
         match stmt {
             PrintStmt(expr) | ExprStmt(expr) => self.analyse_expr(expr),
-            VarStmt(token, _, expr) => Ok(self.env.define(token.lexeme.clone(), IVariable(expr.is_some()))),
-            LetStmt(token, _, _) => Ok(self.env.define(token.lexeme.clone(), ILetBinding())),
-//            CurriedFn(token, params, _, _) => Ok(self.env.define(token.lexeme.clone(), IFunction())),
-            FnStmt(name, _, _, _, _) => self.analyse_fn_decl(name),
-            Curried(name, _, _, _) => self.analyse_fn_decl(name),
+            VarStmt { name , init, .. } => self.analyse_var_decl(name, init),
+            LetStmt{ name , init, ..} => self.analyse_let_binding(name, init),
+            FnStmt { name , ..} => self.analyse_fn_decl(name),
+            FnCurried{ name , ..} => self.analyse_fn_decl(name),
+            BlockStmt(xs) => self.analyse_block(xs),
+            ReturnStmt { token, value } => self.analyse_return_stmt(token, value),
             x => unimplemented!("Unimplemented in analyse stmt {}", x)
         }
     }
 
-    fn analyse_fn_decl(&mut self, name: &Option<String>) -> Result<(), LError> {
-        if let Some(name) = name { Ok(self.env.define(name.clone(), IFunction())) }
-        else { Ok(()) }
+    fn analyse_block(&mut self, block: &Vec<Stmt>) -> Result<StaticInfo, LError> {
+        block.iter().map(|x| self.analyse_stmt(x)).collect::<Result<Vec<_>, LError>>()?;
+        Ok(IEmpty)
     }
 
-    fn analyse_expr(&self, expr: &Expr) -> Result<(), LError> {
+    fn analyse_return_stmt(&self, token: &Token, value: &Option<Expr>) -> Result<StaticInfo, LError> {
+        if let Some(expr) = value { self.analyse_expr(expr)?; }
+        // Check whether return is within a function
+        Ok(IEmpty)
+    }
+
+    fn analyse_var_decl(&mut self, name: &Token, init: &Option<Expr>) -> Result<StaticInfo, LError> {
+        if let Some(init) = init {
+            self.analyse_expr(init)?;
+        }
+        self.env.define(name.lexeme.clone(), IVariable(init.is_some()));
+        Ok(IEmpty)
+    }
+
+    fn analyse_let_binding(&mut self, name: &Token, init: &Expr) -> Result<StaticInfo, LError> {
+        self.analyse_expr(init)?;
+        self.env.define(name.lexeme.clone(), ILetBinding);
+        Ok(IEmpty)
+    }
+
+    fn analyse_fn_decl(&mut self, name: &Option<String>) -> Result<StaticInfo, LError> {
+        if let Some(name) = name {
+            self.env.define(name.clone(), IFunction);
+        }
+        Ok(IEmpty)
+    }
+
+    fn analyse_var(&self, name: &Token) -> Result<StaticInfo, LError> {
+        let info = self.env.resolve(name)?;
+        match &info {
+            IVariable(isinitialized) => if !isinitialized {
+                return Err(LError::from_token(format!("Variable {} is not intialized yet", name.lexeme), name))
+            }
+            _ => {}
+        };
+        Ok(info)
+    }
+
+    fn analyse_expr(&self, expr: &Expr) -> Result<StaticInfo, LError> {
         match expr {
-            EVariable(token) => match self.env.resolve(token)? {
-                IVariable(isinitialized) => if !isinitialized {
-                    Err(LError::from_token(format!("Variable {} is not intialized yet", token.lexeme), token))
-                } else { Ok(()) },
-                IFunction() => Ok(()),
-                _ => unreachable!()
+            EVariable { name, .. } => self.analyse_var(name),
+            EApplication { callee, arg , .. } => {
+                self.analyse_expr(arg)?;
+                self.analyse_expr(callee)
             },
-            ECurryApplication(_, callee, arg) => {
-                self.analyse_expr(callee)?;
-                self.analyse_expr(arg)
-            },
-            _ => Ok(())
+            EAssignment { lvalue, expr } => self.analyse_assignment(lvalue, expr),
+            _ => Ok(IEmpty)
 
         }
+    }
+
+    fn analyse_assignment(&self, lvalue: &Token, expr: &Expr) -> Result<StaticInfo, LError> {
+        let info = self.analyse_var(lvalue)?;
+        if let ILetBinding = info {
+            return Err(LError::from_token(format!("Cannot assign to immutable let binding {}", lvalue.lexeme), lvalue))
+        }
+        self.analyse_expr(expr)
     }
 
 }

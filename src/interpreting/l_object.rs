@@ -4,7 +4,7 @@ use crate::interpreting::Function;
 use crate::interpreting::l_object::LObject::{LFunction, LTuple};
 use crate::parsing::expr::format_tuple;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum LObject {
     LString(String),
     LNumber(f64),
@@ -30,6 +30,12 @@ impl LObject {
 //        if let LBool(b) = self { *b }
 //        else { panic!("Expected LObject to be a boolean") }
 //    }
+
+    pub fn function(&mut self) -> &mut Function {
+        if let LFunction(f) = self { f }
+        else { panic!("Expected LObject to be a number") }
+    }
+
 }
 
 impl Display for LObject {
