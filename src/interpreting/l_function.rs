@@ -1,4 +1,4 @@
-use crate::interpreting::{LInvocable, LObject, Interpreter, Env};
+use crate::interpreting::{LInvocable, LObject, Interpreter, Env, InterpreterError};
 use crate::parsing::Stmt;
 use crate::errors::LError;
 use std::fmt::{Display, Error, Formatter};
@@ -25,7 +25,7 @@ impl Function {
 impl LInvocable for Function {
     // In these particular instances cloning instead of reference is important so the closures carry the relevant information at that particular instance in time
     // An alternative would be to use persistent data structures but performance is not a priority
-    fn invoke(&self, interpreter: &mut Interpreter, arg: &LObject) -> Result<LObject, LError> {
+    fn invoke(&self, interpreter: &mut Interpreter, arg: &LObject) -> Result<LObject, InterpreterError> {
         let mut env = Env::new(Some(self.closure.clone()));
         match &self.declaration {
             FnCurried { name, token, param, ret } => {
@@ -47,25 +47,31 @@ impl LInvocable for Function {
                 } else if paramnames.len() == 1 {
                     env.define(paramnames[0].clone(), Some(arg.clone()))
                 }
-                let enclosing = interpreter.env.clone(); // The corresponding code in execute_block will not be executed due to not having a finally block
-                match panic::catch_unwind(AssertUnwindSafe(|| interpreter.execute_block(body, env))) {
-                    Ok(res) => {
-                        // Manually updating function closure for state changes that occur in block
-                        let (ret_val, new_env) = res?;
-                        // self.closure = new_env.enclosing().clone().unwrap();
+                match interpreter.execute_block(body, env) {
+                    Ok((ret_val, new_env)) => {
+//                        self.closure = new_env.enclosing().clone().unwrap();
                         Ok(ret_val)
-
                     },
-                    Err(ret) => {
-                        panic::take_hook();
-                        let ret_val = match ret.downcast::<LObject>() {
-                            Ok(val) => *val,
-                            Err(err) => LUnit
-                        };
-                        interpreter.env = enclosing; // Manually restore interpreter environment if interrupted
-                        Ok(ret_val)
-                    }
+                    Err(e) => Err(e)
                 }
+//                match panic::catch_unwind(AssertUnwindSafe(|| interpreter.execute_block(body, env))) {
+//                    Ok(res) => {
+//                        // Manually updating function closure for state changes that occur in block
+//                        let (ret_val, new_env) = res?;
+//                        // self.closure = new_env.enclosing().clone().unwrap();
+//                        Ok(ret_val)
+//
+//                    },
+//                    Err(ret) => {
+//                        panic::take_hook();
+//                        let ret_val = match ret.downcast::<LObject>() {
+//                            Ok(val) => *val,
+//                            Err(err) => LUnit
+//                        };
+//                        interpreter.env = enclosing; // Manually restore interpreter environment if interrupted
+//                        Ok(ret_val)
+//                    }
+//                }
             }
             _ => panic!("Invoke on non function")
         }

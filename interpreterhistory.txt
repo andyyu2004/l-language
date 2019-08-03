@@ -1,17 +1,3 @@
-fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
-fac 4 !
-fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
-fac 4 !
-fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
-fac 4 !
-fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
-fac 4 !
-fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
-fac 4 !
-fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
-fac 4 !
-fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
-fac 4 !
 fac 10 !
 fac 4 !
 fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
@@ -98,3 +84,17 @@ fn fac = n: Int : Int { if n < 2 { 1 } else { n + fac (n - 1) }}
 fac 56 !
 fn fac = n: Int : Int { if n < 2 { 1 } else { n + fac (n - 1) }}
 fac 55 !
+fn fac = n: Int : Int { if n < 2 { 1 } else { n + fac (n - 1) }}
+fac 55 !
+fac 5 !
+fn fac = n: Int : Int { if n < 2 { 1 } else { n + fac (n - 1) }}
+fac 5 !
+fac 100 !
+fac 55 !
+fn fac = n: Int : Int { if n < 2 { 1 } else { n + fac (n - 1) }}
+fac 55 !
+fn fac = n: Int : Int { if n < 2 { 1 } else { n + fac (n - 1) }}
+fac 20 !
+fac 25 !
+fac 40 !
+fac 45 !

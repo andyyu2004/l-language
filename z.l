@@ -34,5 +34,8 @@
 fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
 // fac 1 !
 // fac 2 !
-fac 55 !
+// fac 55 !
 
+fn f() { return 5; }
+
+f() !
