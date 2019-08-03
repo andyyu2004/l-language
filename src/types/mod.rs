@@ -1,17 +1,19 @@
 pub mod l_types;
 pub mod type_checker;
+mod operator_type_map;
 
 pub use l_types::LType;
 use std::fmt::{Display, Formatter, Error};
 use crate::lexing::{Token};
 use crate::errors::LError;
-use crate::types::LTypeError::{TypeError, TypeMismatch, NonFunction};
+use crate::types::LTypeError::{TypeError, TypeMismatch, NonFunction, InvalidDeclaration};
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum LTypeError {
     TypeMismatch(LType, LType, Token),
     TypeError(LType, LType, Token),
-    NonFunction(LType, Token)
+    NonFunction(LType, Token),
+    InvalidDeclaration,
 }
 
 impl Display for LTypeError {
@@ -20,6 +22,7 @@ impl Display for LTypeError {
             TypeMismatch(l, r, token) => write!(f, "{}", LError::from_token(format!("Couldn't match types {} and {}", l, r), token)),
             TypeError(l, r, token) => write!(f, "{}", LError::from_token(format!("Expected {}, got {}", l, r), token)),
             NonFunction(t, token) => write!(f, "{}", LError::from_token(format!("Expected function type, got {}", t), token)),
+            InvalidDeclaration => Ok(()) // Cascaded failure
         }
     }
 }

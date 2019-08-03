@@ -24,7 +24,7 @@ use crate::parsing::ParseMode;
 fn main() {
 
     let args = env::args().collect::<Vec<String>>();
-
+    
     if args.len() == 2 {
         let path = &args[1];
         match fs::read_to_string(path) {
@@ -116,20 +116,20 @@ fn main() {
 
         if let Err(err) = analyser.analyse(&statements) {
             eprintln!("Error in static analyser");
-            err.iter().for_each(|e| eprintln!("{}", e));
+            err.iter().for_each(|e| eprint!("{}", e));
             continue;
         }
 
-        if let Err(err) = typechecker.type_check(&statements) {
-            eprintln!("Typecheck error");
-            err.iter().for_each(|e| eprintln!("{}", e));
-            continue;
-        }
+//        if let Err(err) = typechecker.type_check(&statements) {
+//            eprintln!("Typecheck error");
+//            err.iter().for_each(|e| eprint!("{}", e));
+//            continue;
+//        }
 
 
         if let Err(errors) = interpreter.interpret(statements) {
             println!("Interpreter Error: ");
-            errors.iter().for_each(|x| eprintln!("{}", x));
+            errors.iter().for_each(|x| eprint!("{}", x));
         }
 
 
@@ -166,7 +166,7 @@ fn execute(input: String) {
         Ok(t) => t,
         Err(errors) => {
             println!("Lex Error: ");
-            errors.iter().for_each(|x| eprintln!("{}", x));
+            errors.iter().for_each(|x| eprint!("{}", x));
             process::exit(1);
         }
     };
@@ -176,27 +176,27 @@ fn execute(input: String) {
         Ok(s) => s,
         Err(errors) => {
             println!("Parse Error: ");
-            errors.iter().for_each(|x| eprintln!("{}", x));
+            errors.iter().for_each(|x| eprint!("{}", x));
             process::exit(1);
         }
     };
 
     if let Err(err) = analyser.analyse(&statements) {
         eprintln!("Error in static analyser");
-        err.iter().for_each(|e| eprintln!("{}", e));
+        err.iter().for_each(|e| eprint!("{}", e));
         process::exit(1)
     }
 
 //    if let Err(err) = typechecker.type_check(&statements) {
 //        eprintln!("Typecheck error");
-//        err.iter().for_each(|e| eprintln!("{}", e));
+//        err.iter().for_each(|e| eprint!("{}", e));
 //        process::exit(1)
 //    }
 
 
     if let Err(errors) = interpreter.interpret(statements) {
         println!("Interpreter Error: ");
-        errors.iter().for_each(|x| eprintln!("{}", x));
+        errors.iter().for_each(|x| eprint!("{}", x));
         process::exit(1)
     }
 

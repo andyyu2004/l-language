@@ -5,13 +5,13 @@ use crate::types::LType;
 use crate::lexing::Token;
 use itertools::join;
 use crate::types::l_types::NameTypePair;
-use crate::parsing::stmt::Stmt::{ExprStmt, PrintStmt, VarStmt, FnStmt, LetStmt, FnCurried, BlockStmt, ReturnStmt};
+use crate::parsing::stmt::Stmt::{ExprStmt, LStmt, VarStmt, FnStmt, LetStmt, FnCurried, ReturnStmt, PrintStmt};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
     ExprStmt(Expr),
+    LStmt(Expr), // Expr result not coerced to LUnit like exprstmt
     PrintStmt(Expr),
-    BlockStmt(Vec<Stmt>),
     ReturnStmt { token: Token, value: Option<Expr> },
     VarStmt { name: Token, ltype: LType, init: Option<Expr> },
     LetStmt { name: Token, ltype: LType, init: Expr },
@@ -24,9 +24,9 @@ impl Display for Stmt {
         match self {
             ExprStmt(expr) => write!(f, "ExprStmt(\n\t{}\n)", expr),
             PrintStmt(expr) => write!(f, "Print(\n\t{}\n)", expr),
+            LStmt(expr) => write!(f, "LStmt(\n\t{}\n)", expr),
             VarStmt { name, ltype, init } if init.is_some() => write!(f, "var {}: {} <- {}", name.lexeme, ltype, init.as_ref().unwrap()),
             VarStmt { name, ltype, .. } => write!(f, "var {}: {}", name.lexeme, ltype),
-            BlockStmt(xs) => write!(f, "{{{}}}", format_block(xs)),
             LetStmt { name, ltype, init } => write!(f, "var {}: {} <- {})", name.lexeme, ltype, init),
 //            CurriedFn(, name, params, ret, body) => write!(f, "fn {} = {} : {} {{\n{}}}", name.lexeme, format_args(params, " => "), ret, format_block(body)),
             FnStmt { name, params, ret_type, body, .. } => match name {
@@ -45,10 +45,10 @@ impl Display for Stmt {
     }
 }
 
-fn format_args(args: &Vec<NameTypePair>, sep: &str) -> String {
+pub fn format_args(args: &Vec<NameTypePair>, sep: &str) -> String {
     join(args, sep)
 }
 
-fn format_block(statements: &Vec<Stmt>) -> String {
+pub fn format_block(statements: &Vec<Stmt>) -> String {
     join(statements, ";\n")
 }

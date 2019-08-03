@@ -43,6 +43,7 @@ pub enum TokenType {
     Fn,
     Typename,
     Return,
+    If, Else,
     RightArrow, RightFatArrow
 }
 

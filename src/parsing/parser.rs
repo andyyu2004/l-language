@@ -5,9 +5,9 @@ use crate::parsing::{Expr, Stmt, ParseMode};
 use crate::errors::LError;
 use crate::types::LType;
 use crate::types::l_types::NameTypePair;
-use crate::parsing::stmt::Stmt::{FnStmt, LetStmt, FnCurried, VarStmt, BlockStmt, ReturnStmt};
+use crate::parsing::stmt::Stmt::{FnStmt, LetStmt, FnCurried, VarStmt, ReturnStmt};
 use crate::types::l_types::LType::{TTuple, TUnit, TNum, TBool};
-use crate::parsing::expr::Expr::{EApplication, EBinary, EUnary, ELiteral, EVariable, EAssignment};
+use crate::parsing::expr::Expr::{EApplication, EBinary, EUnary, ELiteral, EVariable, EAssignment, EIf, EBlock};
 use std::borrow::Borrow;
 
 /*
@@ -122,9 +122,7 @@ impl Parser {
 
     // <statement> ::= <exprStmt> | <printStmt>
     fn parse_statement(&mut self) -> Result<Stmt, LError> {
-        if self.match1(TokenType::LBrace) {
-            Ok(BlockStmt(self.parse_block()?))
-        } else if self.match1(TokenType::Return) {
+        if self.match1(TokenType::Return) {
             self.parse_return_stmt()
         } else {
             self.parse_exprstmt()
@@ -136,13 +134,11 @@ impl Parser {
         let expr = self.parse_expression()?;
         // If there is ; expr_stmt, else expr
         if self.match1(TokenType::Semicolon) {
-            return Ok(Stmt::ExprStmt(expr))
+            Ok(Stmt::ExprStmt(expr))
         } else if self.match1(TokenType::Bang) {
-            return Ok(Stmt::PrintStmt(expr))
-        }
-        match self.mode {
-            ParseMode::Interactive => Ok(Stmt::PrintStmt(expr)),
-            ParseMode::Interpreted => Err(LError::from_token("Expected ! or ; to terminate statement".to_string(), self.current()))
+            Ok(Stmt::PrintStmt(expr))
+        } else {
+            Ok(Stmt::LStmt(expr))
         }
 
     }
@@ -300,7 +296,7 @@ impl Parser {
 
     // <assn> ::= <lvalue> = <assn> | <eq>
     fn parse_assignment(&mut self) -> Result<Expr, LError> {
-        let expr = self.parse_equality()?;
+        let expr = self.parse_block_expr()?;
         if self.match1(TokenType::Equal) {
             let token = self.previous().clone();
             let rvalue = self.parse_assignment()?;
@@ -313,15 +309,58 @@ impl Parser {
         Ok(expr)
     }
 
+    fn parse_block_expr(&mut self) -> Result<Expr, LError> {
+        if self.match1(TokenType::LBrace) {
+            Ok(EBlock(self.parse_block()?))
+        } else {
+            self.parse_equality()
+        }
+    }
+
+
     // <eq> ::= <comp> { =|!= <comp> }
     fn parse_equality(&mut self) -> Result<Expr, LError> {
-        let mut expr = self.parse_comparison();
+        let mut expr = self.parse_conditional();
         while self.r#match(&[TokenType::DoubleEqual, TokenType::BangEqual]) {
             let operator = self.previous().clone();
             let right = self.parse_addition()?;
             expr = Ok(EBinary { operator, left: Box::new(expr?), right: Box::new(right) })
         }
         expr
+    }
+
+    // Makes sense to slot in conditionals here.
+    // let x = if ..
+    // if x < 5 ..
+    fn parse_conditional(&mut self) -> Result<Expr, LError> {
+        if self.match1(TokenType::If) {
+            let token = self.previous().clone();
+            let condition = self.parse_expression()?;
+            self.expect(TokenType::LBrace)?;
+            let left = EBlock(self.parse_block()?);
+            // Might be easier to represent no else as empty block instead of an Option type
+            let right = if self.match1(TokenType::Else) {
+                if self.match1(TokenType::LBrace) {
+                    self.parse_block().map(EBlock)
+                } else if self.match1(TokenType::If) {
+                    self.i -= 1;
+                    self.parse_conditional()
+                } else {
+                    return Err(LError::from_token("Expected block or if after else".to_string(), self.current()));
+                }
+            } else {
+                Ok(EBlock(vec![]))
+            };
+
+            Ok(EIf {
+                token,
+                condition: Box::new(condition),
+                left: Box::new(left),
+                right: Box::new(right?)
+            })
+        } else {
+            self.parse_comparison()
+        }
     }
 
     // <comp> ::= <add> <> <add>

@@ -1,100 +1,100 @@
-let t = 5;
-let t: Bool = 5;
-let t: Bool = false;
-t = true
-var t: Bool = false;
-t = true
-return
-return;
-return
-return;
-return ;
-return ;;
-return;
-return 2
-return 2;
-return;
-fn f() {}
-f
-f)_
-f()
-fn f() {}
-f()
-fn f() {}
-f()
-fn f() {}
-f()
-fn f() {}
-f()
-fn f() {}
-f()
-fn f() {}
-f()
-fn f() {}
-f()
-fn f() {}
-f()
-fn f() {}
-f()
-fn f() {}
-f()
-fn f() {}
-f()
-e
-fn f() {}
-f()
-fn f() {}
-f()
-fn f() {}
-f()
-fn f() {}
-f()
-fn f() {}
-f()
-fn f() { return 5; }
-fn f()-> Int {}
-fn f()-> Int { return 5; }
-f(4)
-f()
-f(4)
-fn f()-> Int { return 5; }
-f()
-fn f()-> Int { return 5 ! }
-fn f()-> Int {5! return 5; }
-fn f()-> Int { 5 ! return 5; }
-fn f()-> Int { 5 + 5! return 5; }
-fn f()-> Int { 5 + 5; return 5; }
-g()
-f()
-fn f()-> Int { 5 + 5 ! return 5; }
-f()
-fn f()-> Int { 5 + 5 ! return 5; }
-f() + 10
-f + 5
-f() + f
-f() + f()
-fn f()-> Int { 5 + 5 ! return 5; }
-f() + f()
-f()
-fn f() -> Int { 5 + 5 ! return 5; }
-f
-f()
-f() + f()
-f()
-fn f() -> Int { 5 + 5 ! return 5; }
-f()
-fn f() -> Int { 5 + 5 ! return 5; }
-f()
-fn f() -> Int { 5 + 5 ! return 5; }
-f()
-:e
-fn f() -> Int { 5 + 5 ! return 5; }
-f
-fn f() -> Int { 5 + 5 ! return 5; }
-f()
-fn f() -> Int { 5 + 5 ! return 5; }
-f() + f   ()
-f() + f   () + f()
-fn f() -> Int { 5 + 5 ! return 5; }
-f()
-f() + f()
+fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
+fac 4 !
+fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
+fac 4 !
+fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
+fac 4 !
+fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
+fac 4 !
+fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
+fac 4 !
+fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
+fac 4 !
+fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
+fac 4 !
+fac 10 !
+fac 4 !
+fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
+fac 4 !
+fac 10 !
+fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
+fac 10 !
+fac 5
+fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
+fac 5
+fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
+fac 5
+fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
+fac 5
+fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
+fac 5
+fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
+fac 5
+fac 1
+fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
+fac 1
+fac 2
+fac 3
+fac 4
+fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
+fac 4
+fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
+fac 4
+fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
+fac 4
+fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
+fac 4
+fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
+fac 4
+fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
+fac 4
+fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
+fac 4
+fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
+fac 4
+fac 4 !
+fac 10 !
+fac 20!
+fac 30!
+fac 40!
+fn fib = n: Int : Int { if n < 2 { n } else { fib (n-1) + fib(n-2) } }
+fib 0
+fn fib = n: Int : Int { if n < 2 { n } else { fib (n-1) + fib(n-2) } }
+fib 0
+fib 1 0!
+fib 1 !
+fn fib = n: Int : Int { if n < 2 { n } else { fib (n-1) + fib(n-2) } }
+fib 1!
+fib 0!
+fib 2!
+fib 3!
+fib 4!
+fib 5!
+fib 6!
+fib 7!
+fib 10!
+fib 15!
+fib 20!
+fib 25!
+fn fib = n: Int : Int { if n < 2 { n } else { fib (n-1) + fib(n-2) } }
+fib 10!
+fib 20!
+fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
+fac 55
+fac 55 !
+fac 56 !
+fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
+fac 50 !
+fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
+fac 50 !
+fac 10 !
+fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
+fac 56 !
+fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
+fac 56 !
+fn fac = n: Int : Int { if n < 2 { 1 } else { n + fac (n - 1) }}
+fac 56 !
+fn fac = n: Int : Int { if n < 2 { 1 } else { n + fac (n - 1) }}
+fac 56 !
+fn fac = n: Int : Int { if n < 2 { 1 } else { n + fac (n - 1) }}
+fac 55 !

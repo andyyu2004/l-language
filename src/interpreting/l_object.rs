@@ -25,11 +25,11 @@ impl LObject {
         if let LNumber(s) = self { *s }
         else { panic!("Expected LObject to be a number") }
     }
-//
-//    pub fn boolean(&self) -> bool {
-//        if let LBool(b) = self { *b }
-//        else { panic!("Expected LObject to be a boolean") }
-//    }
+
+    pub fn boolean(&self) -> bool {
+        if let LBool(b) = self { *b }
+        else { panic!("Expected LObject to be a boolean") }
+    }
 
     pub fn function(&mut self) -> &mut Function {
         if let LFunction(f) = self { f }

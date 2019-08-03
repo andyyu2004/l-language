@@ -1,6 +1,10 @@
 use std::collections::HashMap;
 use crate::errors::LError;
 use crate::lexing::Token;
+use crate::interpreting::{Function, LObject};
+use crate::interpreting::l_object::LObject::{LFunction, LUnit};
+use crate::parsing::stmt::Stmt::FnStmt;
+use crate::types::l_types::LType::TUnit;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Env<T> where T : Clone {
@@ -53,3 +57,45 @@ impl<T> Env<T> where T : Clone {
         self.vars.get(key)
     }
 }
+
+//impl Env<Option<LObject>>  {
+//    pub fn resolve_obj(&self, key: &Token) -> Result<Option<LObject>, LError> {
+//        match self.vars.get(&key.lexeme) {
+//            Some(x) => if let Some(LFunction(_)) = x { // if is function, return the one higher up
+//                match *self.outer {
+//                    Some(ref env) => {
+//                        env.resolve(key)
+//                    },
+//                    None => Ok(x.clone())
+//                }
+//            } else {
+//                Ok(x.clone())
+//            },
+//            None => match *self.outer {
+//                Some(ref env) => env.resolve_obj(key),
+//                None => Err(LError::from_token(format!("Undefined variable '{}'", key.lexeme), key))
+//            }
+//        }
+//    }
+//}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -2,11 +2,9 @@ use std::collections::HashMap;
 
 use crate::lexing::TokenType;
 
-pub struct Keywords {
+pub struct Keywords {}
 
-}
-
-macro_rules! hashmap {
+#[macro_export] macro_rules! hashmap {
     ($( $key: expr => $val: expr ),*) => {{
          let mut map = ::std::collections::HashMap::new();
          $( map.insert($key, $val); )*
@@ -23,7 +21,9 @@ impl Keywords {
             "true" => TokenType::True,
             "false" => TokenType::False,
             "fn" => TokenType::Fn,
-            "return" => TokenType::Return
+            "return" => TokenType::Return,
+            "if" => TokenType::If,
+            "else" => TokenType::Else
         ]
     }
 }

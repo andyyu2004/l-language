@@ -6,14 +6,17 @@ use std::panic;
 use crate::interpreting::l_object::LObject::{LBool, LTuple, LFunction, LUnit};
 use crate::parsing::stmt::Stmt::{FnCurried, FnStmt};
 use std::panic::AssertUnwindSafe;
+use std::ops::Deref;
+use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Function {
     declaration: Stmt,
-    closure: Env<Option<LObject>>,
+    pub closure: Env<Option<LObject>>,
 }
 
 impl Function {
+
     pub fn new(declaration: Stmt, closure: Env<Option<LObject>>) -> Function {
         Function { declaration, closure }
     }
@@ -22,16 +25,20 @@ impl Function {
 impl LInvocable for Function {
     // In these particular instances cloning instead of reference is important so the closures carry the relevant information at that particular instance in time
     // An alternative would be to use persistent data structures but performance is not a priority
-    fn invoke(&mut self, interpreter: &mut Interpreter, arg: &LObject) -> Result<LObject, LError> {
+    fn invoke(&self, interpreter: &mut Interpreter, arg: &LObject) -> Result<LObject, LError> {
+        let mut env = Env::new(Some(self.closure.clone()));
         match &self.declaration {
             FnCurried { name, token, param, ret } => {
-                let mut env = Env::new(Some(self.closure.clone()));
                 env.define(param.name.clone(), Some(arg.clone()));
                 Ok(LFunction(Function::new(*ret.clone(), env)))
             },
 
-            FnStmt { params, ret_type, body, .. } => {
-                let mut env = Env::new(Some(self.closure.clone()));
+            FnStmt { params, ret_type, body, name,.. } => {
+                // A horrifically inefficient way to allow recursion just like everything else in this interpreter
+                // To do so without manually adding a self reference each invocation requires use of references and lifetimes are hard
+                if let Some(name) = name {
+                    env.define(name.clone(), Some(LFunction(self.clone())));
+                }
                 let paramnames = params.iter().map(|x| x.clone().name).collect::<Vec<String>>();
                 if let LTuple(xs) = arg {
                     for (i, p) in paramnames.iter().enumerate() {
@@ -42,17 +49,23 @@ impl LInvocable for Function {
                 }
                 let enclosing = interpreter.env.clone(); // The corresponding code in execute_block will not be executed due to not having a finally block
                 match panic::catch_unwind(AssertUnwindSafe(|| interpreter.execute_block(body, env))) {
-                    Ok(new_env) => {
-                        self.closure = new_env?.enclosing().clone().unwrap();
+                    Ok(res) => {
+                        // Manually updating function closure for state changes that occur in block
+                        let (ret_val, new_env) = res?;
+                        // self.closure = new_env.enclosing().clone().unwrap();
+                        Ok(ret_val)
+
                     },
                     Err(ret) => {
-                        let retvalue = *ret.downcast::<LObject>().ok().unwrap();
-                        println!("ret {:?}", retvalue);
+                        panic::take_hook();
+                        let ret_val = match ret.downcast::<LObject>() {
+                            Ok(val) => *val,
+                            Err(err) => LUnit
+                        };
                         interpreter.env = enclosing; // Manually restore interpreter environment if interrupted
-                        return Ok(retvalue)
+                        Ok(ret_val)
                     }
-                };
-                Ok(LUnit)
+                }
             }
             _ => panic!("Invoke on non function")
         }

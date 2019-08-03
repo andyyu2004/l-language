@@ -23,9 +23,9 @@ impl Lexer {
         let mut errors = Vec::<LError>::new();
         while let Some(c) = self.safe_peek() {
             match c {
-                '\n' => {self.line += 1; self.col = 0; self.i += 1; continue; },
-                '\t' => {self.col += 4; self.i += 1; continue; },
-                '\r' => {self.col = 0; self.i += 1; continue; },
+                '\n' => { self.line += 1; self.col = 0; self.i += 1; continue; },
+                '\t' => { self.col += 4; self.i += 1; continue; },
+                '\r' => { self.col = 0; self.i += 1; continue; },
                 ' ' => {},
                 ',' => tokens.push(self.create_token(TokenType::Comma, char::to_string(&c))),
                 ':' => tokens.push(self.create_token(TokenType::Colon, char::to_string(&c))),
@@ -42,7 +42,8 @@ impl Lexer {
                 ')' => tokens.push(self.create_token(TokenType::RParen, char::to_string(&c))),
                 ';' => tokens.push(self.create_token(TokenType::Semicolon, char::to_string(&c))),
                 '/' => if self.match_next('/') {
-                    while !self.at_end() && self.peek() != '\n' { self.inc_indexes(); continue; }
+                    while !self.at_end() && self.peek() != '\n' { self.inc_indexes(); }
+                    continue;
                 } else if self.match_next('*') {
 
                 } else {
