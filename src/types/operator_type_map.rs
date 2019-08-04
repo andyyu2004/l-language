@@ -1,16 +1,16 @@
-use crate::lexing::TokenType;
-use crate::types::LType;
-use crate::types::l_types::LType::{TArrow, TTuple, TNum};
-use std::collections::HashMap;
+// use crate::lexing::TokenType;
+// use crate::types::LType;
+// use crate::types::l_types::LType::{TArrow, TTuple, TNum};
+// use std::collections::HashMap;
 
 
-macro_rules! hashmap {
-    ($( $key: expr => $val: expr ),*) => {{
-         let mut map = ::std::collections::HashMap::new();
-         $( map.insert($key, $val); )*
-         map
-    }}
-}
+// macro_rules! hashmap {
+//     ($( $key: expr => $val: expr ),*) => {{
+//          let mut map = ::std::collections::HashMap::new();
+//          $( map.insert($key, $val); )*
+//          map
+//     }}
+// }
 
 struct OperatorTypeMap {}
 

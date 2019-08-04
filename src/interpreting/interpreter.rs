@@ -2,17 +2,14 @@ use crate::interpreting::{Env, Function, LInvocable, InterpreterError};
 use crate::lexing::{TokenType, Token};
 use crate::parsing::{Expr, Stmt};
 use crate::errors::LError;
-use crate::types::l_types::NameTypePair;
+use crate::types::l_types::Pair;
 use crate::types::LType;
-use crate::interpreting::l_object::LObject::{LBool, LString, LNumber, LFunction, LUnit, LTuple};
+use crate::interpreting::l_object::LObject::{LBool, LNumber, LFunction, LUnit, LTuple, LRecord};
 use crate::interpreting::l_object::LObject;
-use itertools::Itertools;
-use crate::parsing::stmt::Stmt::{ExprStmt, LStmt, VarStmt, LetStmt, FnStmt, FnCurried, ReturnStmt, PrintStmt};
-use crate::parsing::expr::Expr::{EUnary, EApplication, EVariable, ELiteral, EBinary, ETuple, EAssignment, EBlock, EIf};
+use crate::parsing::stmt::Stmt::{ExprStmt, LStmt, VarStmt, LetStmt, FnStmt, FnCurried, ReturnStmt, PrintStmt, TypeAlias, WhileStmt};
+use crate::parsing::expr::Expr::{EUnary, EApplication, EVariable, ELiteral, EBinary, ETuple, EAssignment, EBlock, EIf, ERecord, ELogic};
 use std::panic;
-use std::rc::Rc;
-use std::sync::Arc;
-use crate::interpreting::interpreter_error::InterpreterError::{Error, Return};
+use crate::interpreting::interpreter_error::InterpreterError::{Return};
 
 pub struct Interpreter {
     pub env: Env<Option<LObject>>
@@ -50,9 +47,19 @@ impl Interpreter {
                 self.execute_fn_decl(name, token, params, ret_type, body),
             FnCurried { name, token, param, ret} => self.execute_curried_fn_decl(name, token, param, *ret),
             ReturnStmt { value, .. } => self.execute_return_stmt(value),
+            WhileStmt { condition, body, .. } => self.execute_while(condition, body),
+            TypeAlias {..} => Ok(())
 //            CurriedFn(name, args, ret, body) => self.execute_fn_decl(name, args, ret, body),
 //            x => Err(InterpreterError::from(LError::new(format!("Unknown stmt type {}", x), 0, 0)))
         }
+    }
+
+    fn execute_while(&mut self, condition: Expr, body: Vec<Stmt>) -> Result<(), InterpreterError> {
+        while self.evaluate(&condition)?.boolean() == true {
+            let (_, env) = self.execute_block(&body, Env::new(Some(self.env.clone())))?;
+            self.env = env;
+        }
+        Ok(())
     }
 
     fn var_stmt(&mut self, name: Token, expr: Option<Expr>) -> Result<(), InterpreterError> {
@@ -68,7 +75,7 @@ impl Interpreter {
         Ok(self.env.define(name.lexeme, value))
     }
 
-    fn execute_fn_decl(&mut self, name: Option<String>, token: Token, params: Vec<NameTypePair>, ret_type: LType, body: Vec<Stmt>) -> Result<(), InterpreterError> {
+    fn execute_fn_decl(&mut self, name: Option<String>, token: Token, params: Vec<Pair<LType>>, ret_type: LType, body: Vec<Stmt>) -> Result<(), InterpreterError> {
         let fstmt = FnStmt {
             name: name.clone(),
             token: token.clone(),
@@ -80,21 +87,16 @@ impl Interpreter {
         if let Some(ref name) = name {
             self.env.define(name.clone(), Some(lfunction));
             // Need the function environment to contain its own definition for recursion
-            self.env.update(name, Some(LFunction(Function::new(fstmt.clone(), self.env.clone()))));
-            self.env.update(name, Some(LFunction(Function::new(fstmt.clone(), self.env.clone()))));
-//            self.env.update(name, Some(LFunction(Function::new(fstmt.clone(), self.env.clone()))));
-//            self.env.update(name, Some(LFunction(Function::new(fstmt.clone(), self.env.clone()))));
-//            self.env.update(name, Some(LFunction(Function::new(fstmt.clone(), self.env.clone()))));
 //            self.env.update(name, Some(LFunction(Function::new(fstmt.clone(), self.env.clone()))));
         }
         Ok(())
     }
 
-    fn execute_curried_fn_decl(&mut self, name: Option<String>, token: Token, param: NameTypePair, ret: Stmt) -> Result<(), InterpreterError> {
-//        let lfunction = LFunction(Function::new(FnCurried { name: name.clone(), token, param, ret: Box::new(ret) }, self.env.clone()));
-//        if let Some(name) = name {
-//            self.env.define(name, Some(lfunction));
-//        }
+    fn execute_curried_fn_decl(&mut self, name: Option<String>, token: Token, param: Pair<LType>, ret: Stmt) -> Result<(), InterpreterError> {
+        let lfunction = LFunction(Function::new(FnCurried { name: name.clone(), token, param, ret: Box::new(ret) }, self.env.clone()));
+        if let Some(name) = name {
+            self.env.define(name, Some(lfunction));
+        }
         Ok(())
     }
 
@@ -126,7 +128,8 @@ impl Interpreter {
                 _ => { self.execute(stmt)?; LUnit }
             }
         } else { LUnit };
-        let updated_env = self.env.clone();
+
+        let updated_env = self.env.enclosing().clone().unwrap();
         self.env = enclosing.clone();
         Ok((ret_val, updated_env))
     }
@@ -181,6 +184,16 @@ impl Interpreter {
                 TokenType::GreaterEqual => Ok(LBool(self.evaluate(left)?.number() >= self.evaluate(right)?.number())),
                 _ => unreachable!()
             },
+            ELogic { operator, left, right} => {
+                // Short circuit
+                let lobj = self.evaluate(left)?;
+                if operator.ttype == TokenType::DoubleAmpersand {
+                    if lobj.boolean() == false { return Ok(lobj) }
+                } else if operator.ttype == TokenType::DoublePipe {
+                    if lobj.boolean() == true { return Ok(lobj) }
+                }
+                self.evaluate(right)
+            }
             EUnary{ operator, operand} => match operator.ttype {
                 TokenType::Minus => Ok(LNumber(-self.evaluate(operand)?.number())),
                 _ => unreachable!()
@@ -192,8 +205,18 @@ impl Interpreter {
             EAssignment { lvalue, expr} => self.evaluate_assignment(lvalue, expr),
             EBlock(xs) => Ok(self.execute_block(&xs, self.env.clone())?.0),
             EIf { token, condition, left, right } => self.evaluate_if(token, condition, left, right),
+            ERecord(xs) => self.evaluate_record(xs),
             _ => Err(InterpreterError::from(LError::new("Unknown expr type".to_string(), 0, 0)))
         }
+    }
+
+    fn evaluate_record(&mut self, xs: &Vec<Pair<Expr>>) -> Result<LObject, InterpreterError> {
+        let names = xs.iter().map(|x| &x.name).collect::<Vec<&String>>();
+        let mut pairs = vec![];
+        for (i, expr) in xs.iter().map(|x| &x.value).enumerate() {
+            pairs.push(Pair::new(names[i].clone(), self.evaluate(expr)?));
+        }
+        Ok(LRecord(pairs))
     }
 
     fn evaluate_variable(&mut self, name: &Token) -> Result<LObject, InterpreterError> {
@@ -231,10 +254,10 @@ impl Interpreter {
         let mut callee_obj = self.evaluate(callee)?;
         let arg_obj = self.evaluate(arg)?;
         let res = callee_obj.function().invoke(self, &arg_obj);
-        // Manually update variable as taken out a clone from the env
-//        if let EVariable { name, ..} = callee {
-//            self.env.update(&name.lexeme, Some(callee_obj))
-//        }
+        // Manually update closure variables as taken out a clone from the env
+        if let EVariable { name, ..} = callee {
+            self.env.update(&name.lexeme, Some(callee_obj))
+        }
         res
 
     }

@@ -4,7 +4,7 @@ use rustyline::error::ReadlineError;
 use lexing::{Keywords, Lexer};
 use parsing::Parser;
 
-use crate::interpreting::{Interpreter, LObject, Env};
+use crate::interpreting::{Interpreter};
 
 mod parsing;
 mod lexing;
@@ -17,7 +17,7 @@ mod static_analysis;
 
 use std::{env, fs, process};
 use crate::types::type_checker::TypeChecker;
-use crate::static_analysis::Analyser;
+use crate::static_analysis::StaticAnalyser;
 use crate::parsing::ParseMode;
 
 
@@ -40,7 +40,7 @@ fn main() {
     let mut rl = Editor::<()>::new();
     if rl.load_history("interpreterhistory.txt").is_err() {}
 
-    let mut analyser = Analyser::new();
+    let mut analyser = StaticAnalyser::new();
     let mut typechecker = TypeChecker::new();
 //    let mut env = Env::new(None);
     let mut interpreter = Interpreter::new();
@@ -120,11 +120,11 @@ fn main() {
             continue;
         }
 
-//        if let Err(err) = typechecker.type_check(&statements) {
-//            eprintln!("Typecheck error");
-//            err.iter().for_each(|e| eprint!("{}", e));
-//            continue;
-//        }
+        if let Err(err) = typechecker.type_check(&statements) {
+            eprintln!("Typecheck error");
+            err.iter().for_each(|e| eprint!("{}", e));
+            continue;
+        }
 
 
         if let Err(errors) = interpreter.interpret(statements) {
@@ -155,7 +155,7 @@ fn main() {
 // Can't bring upper functionality into function as requires break and continue
 fn execute(input: String) {
 
-    let mut analyser = Analyser::new();
+    let mut analyser = StaticAnalyser::new();
     let mut typechecker = TypeChecker::new();
 //    let mut env = Env::new(None);
     let mut interpreter = Interpreter::new();
@@ -187,11 +187,11 @@ fn execute(input: String) {
         process::exit(1)
     }
 
-//    if let Err(err) = typechecker.type_check(&statements) {
-//        eprintln!("Typecheck error");
-//        err.iter().for_each(|e| eprint!("{}", e));
-//        process::exit(1)
-//    }
+    if let Err(err) = typechecker.type_check(&statements) {
+        eprintln!("Typecheck error");
+        err.iter().for_each(|e| eprint!("{}", e));
+        process::exit(1)
+    }
 
 
     if let Err(errors) = interpreter.interpret(statements) {

@@ -74,6 +74,18 @@ impl Lexer {
                 } else {
                     tokens.push(self.create_token(TokenType::Bang, char::to_string(&c)))
                 },
+                '|' => if self.match_next('|') {
+                    tokens.push(self.create_token(TokenType::DoublePipe, "||".to_string()));
+                    self.inc_indexes();
+                } else {
+                    tokens.push(self.create_token(TokenType::Pipe, char::to_string(&c)))
+                },
+                '&' => if self.match_next('&') {
+                    tokens.push(self.create_token(TokenType::DoubleAmpersand, "&&".to_string()));
+                    self.inc_indexes();
+                } else {
+                    tokens.push(self.create_token(TokenType::Ampersand, char::to_string(&c)))
+                },
                 '0'...'9' => {
                     let start_col = self.col;
                     let num = self.lex_number();

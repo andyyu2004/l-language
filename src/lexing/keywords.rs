@@ -23,7 +23,10 @@ impl Keywords {
             "fn" => TokenType::Fn,
             "return" => TokenType::Return,
             "if" => TokenType::If,
-            "else" => TokenType::Else
+            "else" => TokenType::Else,
+            "record" => TokenType::Record,
+            "type" => TokenType::Type,
+            "while" => TokenType::While
         ]
     }
 }

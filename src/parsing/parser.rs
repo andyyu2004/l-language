@@ -4,11 +4,11 @@ use crate::lexing::token::TokenType;
 use crate::parsing::{Expr, Stmt, ParseMode};
 use crate::errors::LError;
 use crate::types::LType;
-use crate::types::l_types::NameTypePair;
-use crate::parsing::stmt::Stmt::{FnStmt, LetStmt, FnCurried, VarStmt, ReturnStmt};
-use crate::types::l_types::LType::{TTuple, TUnit, TNum, TBool};
-use crate::parsing::expr::Expr::{EApplication, EBinary, EUnary, ELiteral, EVariable, EAssignment, EIf, EBlock};
-use std::borrow::Borrow;
+use crate::types::l_types::Pair;
+use crate::parsing::stmt::Stmt::{FnStmt, LetStmt, FnCurried, VarStmt, ReturnStmt, TypeAlias, WhileStmt};
+use crate::types::l_types::LType::{TTuple, TUnit, TNum, TBool, TRecord, TName};
+use crate::parsing::expr::Expr::{EApplication, EBinary, EUnary, ELiteral, EVariable, EAssignment, EIf, EBlock, ERecord, ELogic};
+use std::fmt::{Display};
 
 /*
 <expr> ::= <addition>
@@ -152,9 +152,29 @@ impl Parser {
             self.parse_var_decl()
         } else if self.match1(TokenType::Fn) {
             self.parse_fn_decl()
+        } else if self.match1(TokenType::Type) {
+            self.parse_type_alias()
+        } else if self.match1(TokenType::While) {
+            self.parse_while()
         } else {
             self.parse_statement()
         }
+    }
+
+    fn parse_while(&mut self) -> Result<Stmt, LError> {
+        let token = self.previous().clone();
+        let condition = self.parse_expression()?;
+        self.expect(TokenType::LBrace)?;
+        let body = self.parse_block()?;
+        Ok(WhileStmt { token, condition, body })
+    }
+
+    fn parse_type_alias(&mut self) -> Result<Stmt, LError> {
+        let name = self.expect(TokenType::Typename)?.clone();
+        self.expect(TokenType::Equal)?;
+        let ltype = self.parse_type()?;
+        self.expect(TokenType::Semicolon)?;
+        Ok(TypeAlias { name, ltype })
     }
 
     // <varDecl> ::= "var" ID ( = <expr> )? ;
@@ -162,8 +182,10 @@ impl Parser {
         // let token = self.expect_discriminant(discriminant(&TokenType::Identifier("")))?;
         let name = self.expect(TokenType::Identifier)?.clone();
         let mut init = None::<Expr>;
-        self.expect(TokenType::Colon)?;
-        let ltype = self.parse_type()?;
+        let mut ltype = None::<LType>;
+        if self.match1(TokenType::Colon) {
+            ltype = Some(self.parse_type()?);
+        }
         if self.r#match1(TokenType::Equal) {
             init = Some(self.parse_expression()?);
         }
@@ -174,8 +196,9 @@ impl Parser {
     // <letBinding> ::= "let" ID = <expr> ;
     fn parse_let_binding(&mut self) -> Result<Stmt, LError> {
         let name = self.expect(TokenType::Identifier)?.clone();
-        self.expect(TokenType::Colon)?;
-        let ltype = self.parse_type()?;
+        let ltype = if self.match1(TokenType::Colon) {
+            Some(self.parse_type()?)
+        } else { None };
         self.expect(TokenType::Equal)?;
         let init = self.parse_expression()?;
         self.expect(TokenType::Semicolon)?;
@@ -216,8 +239,8 @@ impl Parser {
         }
     }
 
-    fn parse_typed_params(&mut self) -> Result<Vec<NameTypePair>, LError> {
-        let mut vec = Vec::<NameTypePair>::new();
+    fn parse_typed_params(&mut self) -> Result<Vec<Pair<LType>>, LError> {
+        let mut vec = Vec::<Pair<LType>>::new();
         while self.current().ttype != TokenType::RParen {
             vec.push(self.parse_name_type_pair()?);
             if !self.match1(TokenType::Comma) { break; }
@@ -226,11 +249,11 @@ impl Parser {
         Ok(vec)
     }
 
-    fn parse_name_type_pair(&mut self) -> Result<NameTypePair, LError> {
+    fn parse_name_type_pair(&mut self) -> Result<Pair<LType>, LError> {
         let name = self.expect(TokenType::Identifier)?.lexeme.clone();
         self.expect(TokenType::Colon)?;
         let ltype = self.parse_type()?;
-        Ok(NameTypePair::new(name, ltype))
+        Ok(Pair::new(name, ltype))
     }
 
     // <type> ::= <typename> | <typename> -> <type>; Right associtive type constructor
@@ -244,24 +267,30 @@ impl Parser {
 
     fn parse_primitive_type(&mut self) -> Result<LType, LError> {
         if self.match1(TokenType::LParen) {
+            // Ambiguous between parentheses and tuple
+            // Try parse as parens first, if it is tuple it will have comma and fail
+            // If its singleton tuple then they are essentially equivalent in this language so doesn't matter
             let backtrack = self.i;
             let expr = self.parse_type();
             if expr.is_err() || self.expect(TokenType::RParen).is_err() {
                 self.i = backtrack;
-                return Ok(TTuple(self.parse_tuple(Parser::parse_type)?))
+                return Ok(TTuple(self.parse_tuple(&Parser::parse_type)?))
             }
             expr
+        } else if self.match1(TokenType::LBrace) {
+            Ok(TRecord(self.parse_record(&Parser::parse_type)?))
         } else {
             let typename= self.expect(TokenType::Typename)?;
-            if &typename.lexeme == "Number" || &typename.lexeme == "Int" { // Allow int as synonym for now
-                Ok(TNum)
-            } else if &typename.lexeme == "Bool" {
-                Ok(TBool)
-            } else if &typename.lexeme == "Unit" {
-                Ok(TUnit)
-            } else {
-                Err(LError::from_token("Unknown type".to_string(), typename))
-            }
+            Ok(TName(typename.clone()))
+//            if &typename.lexeme == "Number" || &typename.lexeme == "Int" { // Allow int as synonym for now
+//                Ok(TNum)
+//            } else if &typename.lexeme == "Bool" {
+//                Ok(TBool)
+//            } else if &typename.lexeme == "Unit" {
+//                Ok(TUnit)
+//            } else {
+//                Ok(TName(typename.clone()))
+//            }
         }
     }
 
@@ -313,25 +342,10 @@ impl Parser {
         if self.match1(TokenType::LBrace) {
             Ok(EBlock(self.parse_block()?))
         } else {
-            self.parse_equality()
+            self.parse_conditional()
         }
     }
 
-
-    // <eq> ::= <comp> { =|!= <comp> }
-    fn parse_equality(&mut self) -> Result<Expr, LError> {
-        let mut expr = self.parse_conditional();
-        while self.r#match(&[TokenType::DoubleEqual, TokenType::BangEqual]) {
-            let operator = self.previous().clone();
-            let right = self.parse_addition()?;
-            expr = Ok(EBinary { operator, left: Box::new(expr?), right: Box::new(right) })
-        }
-        expr
-    }
-
-    // Makes sense to slot in conditionals here.
-    // let x = if ..
-    // if x < 5 ..
     fn parse_conditional(&mut self) -> Result<Expr, LError> {
         if self.match1(TokenType::If) {
             let token = self.previous().clone();
@@ -359,8 +373,40 @@ impl Parser {
                 right: Box::new(right?)
             })
         } else {
-            self.parse_comparison()
+            self.logical_or()
         }
+    }
+
+    // <or> ::= <eq> { || <eq }
+    fn logical_or(&mut self) -> Result<Expr, LError> {
+        let mut expr = self.logical_and();
+        if self.match1(TokenType::DoublePipe) {
+            let operator = self.previous().clone();
+            let right = self.logical_and()?;
+            expr = Ok(ELogic { operator, left: Box::new(expr?), right: Box::new(right) })
+        }
+        expr
+    }
+
+    fn logical_and(&mut self) -> Result<Expr, LError> {
+        let mut expr = self.parse_equality();
+        if self.match1(TokenType::DoubleAmpersand) {
+            let operator = self.previous().clone();
+            let right = self.parse_equality()?;
+            expr = Ok(ELogic { operator, left: Box::new(expr?), right: Box::new(right) })
+        }
+        expr
+    }
+
+    // <eq> ::= <comp> { ==|!= <comp> }
+    fn parse_equality(&mut self) -> Result<Expr, LError> {
+        let mut expr = self.parse_comparison();
+        while self.r#match(&[TokenType::DoubleEqual, TokenType::BangEqual]) {
+            let operator = self.previous().clone();
+            let right = self.parse_comparison()?;
+            expr = Ok(EBinary { operator, left: Box::new(expr?), right: Box::new(right) })
+        }
+        expr
     }
 
     // <comp> ::= <add> <> <add>
@@ -444,7 +490,7 @@ impl Parser {
         expr
     }
 
-    fn parse_tuple<F, T>(&mut self, f: F) -> Result<Vec<T>, LError>
+    fn parse_tuple<F, T>(&mut self, f: &F) -> Result<Vec<T>, LError>
             where F: Fn(&mut Self) -> Result<T, LError> {
         let mut v = Vec::<T>::new();
         if self.current().ttype != TokenType::RParen {
@@ -455,6 +501,26 @@ impl Parser {
         }
         self.expect(TokenType::RParen)?;
         Ok(v)
+    }
+
+    // Expect opening LBrace to be consumed
+    fn parse_record<F, T>(&mut self, f: &F) -> Result<Vec<Pair<T>>, LError>
+            where F: Fn(&mut Self) -> Result<T, LError>, T : Display {
+        let mut v = vec![];
+        while {
+            v.push(self.parse_record_entry(f)?);
+            self.match1(TokenType::Comma)
+        } {}
+        self.expect(TokenType::RBrace)?;
+        Ok(v)
+    }
+
+    fn parse_record_entry<F, T>(&mut self, f: &F) -> Result<Pair<T>, LError>
+                where F: Fn(&mut Self) -> Result<T, LError>, T : Display {
+        let name = self.expect(TokenType::Identifier)?.lexeme.clone();
+        self.expect(TokenType::Colon)?;
+        let value = f(self)?;
+        Ok(Pair::new(name, value))
     }
 
 //    fn parse_tuple(&mut self) -> Result<Vec<Expr>, LError> {
@@ -476,7 +542,7 @@ impl Parser {
             let expr = self.parse_expression();
             if expr.is_err() || self.expect(TokenType::RParen).is_err() {
                 self.i = backtrack;
-                return Ok(Expr::ETuple(self.parse_tuple(Parser::parse_expression)?))
+                return Ok(Expr::ETuple(self.parse_tuple(&Parser::parse_expression)?))
             }
             expr
 //            Ok(Expr::Grouping(Box::new(expr?))) // dont think this is explicitly required
@@ -489,6 +555,9 @@ impl Parser {
             Ok(ELiteral(self.previous().clone()))
         } else if self.match1(TokenType::False){
             Ok(ELiteral(self.previous().clone()))
+        } else if self.match1(TokenType::Record) {
+            self.expect(TokenType::LBrace)?;
+            self.parse_record(&Parser::parse_expression).map(ERecord)
         } else {
             let t = self.current();
             Err(LError::from_token(format!("unexpected token: {}", t), t))

@@ -1,10 +1,7 @@
 use std::collections::HashMap;
 use crate::errors::LError;
 use crate::lexing::Token;
-use crate::interpreting::{Function, LObject};
-use crate::interpreting::l_object::LObject::{LFunction, LUnit};
-use crate::parsing::stmt::Stmt::FnStmt;
-use crate::types::l_types::LType::TUnit;
+
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Env<T> where T : Clone {

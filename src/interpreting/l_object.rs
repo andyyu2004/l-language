@@ -1,8 +1,9 @@
 use LObject::{LNumber, LString, LBool, LUnit};
 use std::fmt::{Display, Formatter, Error};
 use crate::interpreting::Function;
-use crate::interpreting::l_object::LObject::{LFunction, LTuple};
+use crate::interpreting::l_object::LObject::{LFunction, LTuple, LRecord};
 use crate::parsing::expr::format_tuple;
+use crate::types::l_types::Pair;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum LObject {
@@ -11,6 +12,7 @@ pub enum LObject {
     LBool(bool),
     LTuple(Vec<LObject>),
     LFunction(Function),
+    LRecord(Vec<Pair<LObject>>),
     LUnit
 }
 
@@ -47,6 +49,7 @@ impl Display for LObject {
             LUnit => write!(f, "()"),
             LFunction(function) => write!(f, "{}", function),
             LTuple(xs) => write!(f, "({})", format_tuple(xs)),
+            LRecord(xs) => write!(f, "{{{}}}", format_tuple(xs)),
             x => write!(f, "{:?}", x)
         }
     }

@@ -21,7 +21,8 @@ impl Token {
 
 impl Display for Token {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(f, "{} of {} at {}:{}", self.lexeme, self.ttype, self.line, self.col)
+        write!(f, "{}", self.lexeme)
+//        write!(f, "{} of {} at {}:{}", self.lexeme, self.ttype, self.line, self.col)
     }
 }
 
@@ -34,6 +35,8 @@ pub enum TokenType {
     Equal, DoubleEqual, Less, Greater, LessEqual, GreaterEqual, Bang, BangEqual,
     True, False,
     Semicolon,
+    Pipe, DoublePipe,
+    Ampersand, DoubleAmpersand,
     Var,
     Let,
     Print,
@@ -43,7 +46,8 @@ pub enum TokenType {
     Fn,
     Typename,
     Return,
-    If, Else,
+    If, Else, While,
+    Record, Type,
     RightArrow, RightFatArrow
 }
 
