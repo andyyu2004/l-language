@@ -6,7 +6,7 @@ pub use l_types::LType;
 use std::fmt::{Display, Formatter, Error};
 use crate::lexing::{Token};
 use crate::errors::LError;
-use crate::types::LTypeError::{TypeError, TypeMismatch, NonFunction, InvalidDeclaration, RequireTypeAnnotation, NonExistentType};
+use crate::types::LTypeError::{TypeError, TypeMismatch, NonFunction, InvalidDeclaration, RequireTypeAnnotation, NonExistentType, NonExistentField, NotGettable};
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum LTypeError {
@@ -14,6 +14,8 @@ pub enum LTypeError {
     TypeError(LType, LType, Token),
     NonFunction(LType, Token),
     NonExistentType(Token),
+    NonExistentField(Token, LType),
+    NotGettable(Token, LType),
     RequireTypeAnnotation(Token),
     InvalidDeclaration, // When function does not exist, due to definition having failed, don't report error as it is fallthrough
 }
@@ -26,7 +28,9 @@ impl Display for LTypeError {
             NonFunction(t, token) => write!(f, "{}", LError::from_token(format!("Expected function type, got {}", t), token)),
             RequireTypeAnnotation(token) => write!(f, "{}", LError::from_token("Unintialised var declaration requires type signature".to_string(), token)),
             NonExistentType(token) => write!(f, "{}", LError::from_token(format!("Cannot find type {}", token.lexeme), token)),
-            InvalidDeclaration => write!(f, "Invalid decl") // Ok(()) // Cascaded failure
+            NonExistentField(token, ltype) => write!(f, "{}", LError::from_token(format!("Field {} does not exist on type {}", token.lexeme, ltype), token)),
+            InvalidDeclaration => write!(f, "Invalid decl"), // Ok(()) // Cascaded failure
+            NotGettable(token, ltype) => write!(f, "{}", LError::from_token(format!("{} is not gettable", ltype), token)),
         }
     }
 }

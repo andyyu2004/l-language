@@ -2,12 +2,16 @@ use crate::parsing::{Stmt, Expr};
 use crate::errors::LError;
 use crate::parsing::stmt::Stmt::{LStmt, ExprStmt, VarStmt, LetStmt, FnStmt, FnCurried, ReturnStmt, PrintStmt, TypeAlias, WhileStmt};
 use crate::interpreting::{Env};
-use crate::parsing::expr::Expr::{EVariable, EApplication, EAssignment, EBlock, EIf, ERecord, ELogic, EBinary};
+use crate::parsing::expr::Expr::{EVariable, EApplication, EAssignment, EBlock, EIf, ERecord, ELogic, EBinary, EGet, ETuple, ESet};
 use crate::static_analysis::StaticInfo;
 use crate::static_analysis::static_info::StaticInfo::{IVariable, ILetBinding, IFunction, IEmpty};
 use crate::lexing::Token;
 use crate::types::l_types::Pair;
 use crate::types::LType;
+use std::collections::HashMap;
+use itertools::Itertools;
+use std::rc::Rc;
+use std::cell::RefCell;
 
 enum FunctionEnv {
     None, Function
@@ -17,13 +21,13 @@ enum FunctionEnv {
 // Unintialized and undefined variables
 
 pub struct StaticAnalyser {
-    env: Env<StaticInfo>,
+    env: Rc<RefCell<Env<StaticInfo>>>,
     fstack: Vec<FunctionEnv>
 }
 
 impl StaticAnalyser {
     pub fn new() -> StaticAnalyser {
-        StaticAnalyser { env: Env::new(None), fstack: Vec::new() }
+        StaticAnalyser { env: Rc::new(RefCell::new(Env::new(None))), fstack: Vec::new() }
     }
 }
 
@@ -57,6 +61,43 @@ impl StaticAnalyser {
         }
     }
 
+    fn analyse_expr(&mut self, expr: &Expr) -> Result<StaticInfo, LError> {
+        match expr {
+            EVariable { name, .. } => self.analyse_var(name),
+            EApplication { callee, arg , .. } => {
+                self.analyse_expr(arg)?;
+                self.analyse_expr(callee)
+            },
+            ERecord(token, xs) => self.analyse_record(token, xs),
+            ETuple(_, xs) => { for x in xs { self.analyse_expr(x)?; } ; Ok(IEmpty) }
+            EAssignment { lvalue, expr } => self.analyse_assignment(lvalue, expr),
+            EBlock(xs) => self.analyse_block(xs),
+            EIf { condition, left, right, .. } => self.analyse_if(condition, left, right),
+            EGet { name, expr } => self.analyse_get_expr(name, expr),
+            ESet { name, expr, value} => self.analyse_set_expr(name, expr, value),
+            ELogic { operator, left, right} | EBinary { operator, left, right } =>
+                self.analyse_binary(operator, left, right),
+            _ => Ok(IEmpty)
+        }
+    }
+
+    fn analyse_record(&mut self, token: &Token, xs: &HashMap<String, Expr>) -> Result<StaticInfo, LError> {
+        for x in xs.values() {
+            self.analyse_expr(&x)?;
+        }
+        Ok(IEmpty)
+    }
+
+    fn analyse_get_expr(&mut self, name: &Token, expr: &Expr) -> Result<StaticInfo, LError> {
+        // Expr must be gettable, not sure how to define that yet
+        self.analyse_expr(expr)
+    }
+
+    fn analyse_set_expr(&mut self, name: &Token, expr: &Expr, value: &Expr) -> Result<StaticInfo, LError> {
+        self.analyse_expr(expr)?;
+        self.analyse_expr(value)
+    }
+
     fn analyse_block(&mut self, block: &Vec<Stmt>) -> Result<StaticInfo, LError> {
         block.iter().map(|x| self.analyse_stmt(x)).collect::<Result<Vec<_>, LError>>()?;
         Ok(IEmpty)
@@ -75,25 +116,28 @@ impl StaticAnalyser {
         if let Some(init) = init {
             self.analyse_expr(init)?;
         }
-        self.env.define(name.lexeme.clone(), IVariable(init.is_some()));
+//        if self.env.borrow().resolve(name).is_ok() {
+//            return Err(LError::from_token(format!("Variable '{}' already in scope", name.lexeme), name))
+//        }
+        self.env.borrow_mut().define(name.lexeme.clone(), IVariable(init.is_some()));
         Ok(IEmpty)
     }
 
     fn analyse_let_binding(&mut self, name: &Token, init: &Expr) -> Result<StaticInfo, LError> {
         self.analyse_expr(init)?;
-        self.env.define(name.lexeme.clone(), ILetBinding);
+        self.env.borrow_mut().define(name.lexeme.clone(), ILetBinding);
         Ok(IEmpty)
     }
 
     fn analyse_fn_decl(&mut self, name: &Option<String>, params: &Vec<Pair<LType>>, body: &Vec<Stmt>) -> Result<StaticInfo, LError> {
         self.fstack.push(FunctionEnv::Function);
         if let Some(name) = name {
-            self.env.define(name.clone(), IFunction);
+            self.env.borrow_mut().define(name.clone(), IFunction);
         }
         let enclosing = self.env.clone();
-        self.env = Env::new(Some(self.env.clone()));
+        self.env = Rc::new(RefCell::new(Env::new(Some(Rc::clone(&self.env)))));
         for nt in params {
-            self.env.define(nt.name.clone(), IVariable(true))
+            self.env.borrow_mut().define(nt.name.clone(), IVariable(true))
         }
         for stmt in body {
             self.analyse_stmt(stmt)?;
@@ -105,20 +149,20 @@ impl StaticAnalyser {
 
     fn analyse_curried_fn_decl(&mut self, name: &Option<String>, param: &Pair<LType>, ret: &Stmt) -> Result<StaticInfo, LError> {
         if let Some(name) = name {
-            self.env.define(name.clone(), IFunction);
+            self.env.borrow_mut().define(name.clone(), IFunction);
         }
 
         let enclosing = self.env.clone();
-        self.env = Env::new(Some(self.env.clone()));
+        self.env = Rc::new(RefCell::new(Env::new(Some(Rc::clone(&self.env)))));
         let p = param.name.clone();
-        self.env.define(p, IVariable(true));
+        self.env.borrow_mut().define(p, IVariable(true));
         let res = self.analyse_stmt(ret);
         self.env = enclosing;
         res
     }
 
     fn analyse_var(&self, name: &Token) -> Result<StaticInfo, LError> {
-        let info = self.env.resolve(name)?;
+        let info = self.env.borrow().resolve(name)?;
         match &info {
             IVariable(isinitialized) => if !isinitialized {
                 return Err(LError::from_token(format!("Variable {} is not intialized yet", name.lexeme), name))
@@ -126,28 +170,6 @@ impl StaticAnalyser {
             _ => {}
         };
         Ok(info)
-    }
-
-    fn analyse_expr(&mut self, expr: &Expr) -> Result<StaticInfo, LError> {
-        match expr {
-            EVariable { name, .. } => self.analyse_var(name),
-            EApplication { callee, arg , .. } => {
-                self.analyse_expr(arg)?;
-                self.analyse_expr(callee)
-            },
-            ERecord(xs) => {
-                for x in xs.iter().map(|x| &x.value) {
-                    self.analyse_expr(&x)?;
-                }
-                Ok(IEmpty)
-            },
-            EAssignment { lvalue, expr } => self.analyse_assignment(lvalue, expr),
-            EBlock(xs) => self.analyse_block(xs),
-            EIf { condition, left, right, .. } => self.analyse_if(condition, left, right),
-            ELogic { operator, left, right} | EBinary { operator, left, right } =>
-                self.analyse_binary(operator, left, right),
-            _ => Ok(IEmpty)
-        }
     }
 
     fn analyse_binary(&mut self, token: &Token, left: &Expr, right: &Expr) -> Result<StaticInfo, LError> {
@@ -162,7 +184,8 @@ impl StaticAnalyser {
     }
 
     fn analyse_assignment(&mut self, lvalue: &Token, expr: &Expr) -> Result<StaticInfo, LError> {
-        let info = self.analyse_var(lvalue)?;
+//        let info = self.analyse_var(lvalue)?;
+        let info = self.env.borrow().resolve(lvalue)?;
         if let ILetBinding = info {
             return Err(LError::from_token(format!("Cannot assign to immutable let binding {}", lvalue.lexeme), lvalue))
         }

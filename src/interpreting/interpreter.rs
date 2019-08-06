@@ -1,24 +1,30 @@
 use crate::interpreting::{Env, Function, LInvocable, InterpreterError};
 use crate::lexing::{TokenType, Token};
-use crate::parsing::{Expr, Stmt};
+use crate::parsing::{Expr, Stmt, Mode};
 use crate::errors::LError;
 use crate::types::l_types::Pair;
 use crate::types::LType;
 use crate::interpreting::l_object::LObject::{LBool, LNumber, LFunction, LUnit, LTuple, LRecord};
 use crate::interpreting::l_object::LObject;
 use crate::parsing::stmt::Stmt::{ExprStmt, LStmt, VarStmt, LetStmt, FnStmt, FnCurried, ReturnStmt, PrintStmt, TypeAlias, WhileStmt};
-use crate::parsing::expr::Expr::{EUnary, EApplication, EVariable, ELiteral, EBinary, ETuple, EAssignment, EBlock, EIf, ERecord, ELogic};
+use crate::parsing::expr::Expr::{EUnary, EApplication, EVariable, ELiteral, EBinary, ETuple, EAssignment, EBlock, EIf, ERecord, ELogic, EGet, ESet};
 use std::panic;
 use crate::interpreting::interpreter_error::InterpreterError::{Return};
+use std::collections::HashMap;
+use std::rc::Rc;
+use std::cell::{RefCell};
+use crate::lexing::token::TokenType::{BangEqual, DoubleEqual, LessEqual, GreaterEqual, Caret, Slash, Plus, Star, Less, Minus, Greater};
 
 pub struct Interpreter {
-    pub env: Env<Option<LObject>>
+    pub env: Rc<RefCell<Env<Option<Rc<RefCell<LObject>>>>>>,
+    mode: Mode
 }
 
 impl Interpreter {
-    pub fn new() -> Interpreter {
+    pub fn new(mode: Mode) -> Interpreter {
         Interpreter {
-            env: Env::new(None)
+            env: Rc::new(RefCell::new(Env::new(None))),
+            mode
         }
     }
 }
@@ -39,8 +45,12 @@ impl Interpreter {
 
     fn execute(&mut self, statement: Stmt) -> Result<(), InterpreterError> {
         match statement {
-            ExprStmt(expr) | LStmt(expr) => { self.evaluate(&expr)?; Ok(()) },
-            PrintStmt(expr) => Ok(println!("{}", self.evaluate(&expr)?)),
+            LStmt(expr) => match self.mode {
+                Mode::Interactive => self.execute(PrintStmt(expr)),
+                Mode::Interpreted => self.execute(ExprStmt(expr))
+            },
+            ExprStmt(expr) => { self.evaluate(&expr)?; Ok(()) },
+            PrintStmt(expr) => Ok(println!("{}", self.evaluate(&expr)?.borrow())),
             VarStmt { name, init, ..} => self.var_stmt(name, init),
             LetStmt {name, init, .. } => self.let_stmt(name, init),
             FnStmt { name, token, params, ret_type, body} =>
@@ -55,9 +65,8 @@ impl Interpreter {
     }
 
     fn execute_while(&mut self, condition: Expr, body: Vec<Stmt>) -> Result<(), InterpreterError> {
-        while self.evaluate(&condition)?.boolean() == true {
-            let (_, env) = self.execute_block(&body, Env::new(Some(self.env.clone())))?;
-            self.env = env;
+        while self.evaluate(&condition)?.borrow().boolean() == true {
+            let res = self.execute_block(&body, Rc::new(RefCell::new(Env::new(Some(Rc::clone(&self.env))))))?;
         }
         Ok(())
     }
@@ -67,12 +76,12 @@ impl Interpreter {
         let value = if let Some(x) = expr {
             Some(self.evaluate(&x)?)
         } else { None };
-        Ok(self.env.define(name.lexeme.to_string(), value))
+        self.env = Rc::new(RefCell::new(Env::new(Some(Rc::clone(&self.env)))));
+        Ok(self.env.borrow_mut().define(name.lexeme, value))
     }
 
     fn let_stmt(&mut self, name: Token, expr: Expr) -> Result<(), InterpreterError> {
-        let value = Some(self.evaluate(&expr)?);
-        Ok(self.env.define(name.lexeme, value))
+        self.var_stmt(name, Some(expr))
     }
 
     fn execute_fn_decl(&mut self, name: Option<String>, token: Token, params: Vec<Pair<LType>>, ret_type: LType, body: Vec<Stmt>) -> Result<(), InterpreterError> {
@@ -83,63 +92,68 @@ impl Interpreter {
             ret_type: ret_type.clone(),
             body: body.clone()
         };
-        let lfunction = LFunction(Function::new(fstmt.clone(), self.env.clone()));
-        if let Some(ref name) = name {
-            self.env.define(name.clone(), Some(lfunction));
-            // Need the function environment to contain its own definition for recursion
-//            self.env.update(name, Some(LFunction(Function::new(fstmt.clone(), self.env.clone()))));
+        let lfunction = self.wrap(LFunction(Function::new(fstmt.clone(), Rc::clone(&self.env))));
+        if let Some(name) = name {
+            self.env.borrow_mut().define(name, Some(Rc::clone(&lfunction)));
+            lfunction.borrow_mut().function_mut().closure = Rc::clone(&self.env);
         }
         Ok(())
     }
 
     fn execute_curried_fn_decl(&mut self, name: Option<String>, token: Token, param: Pair<LType>, ret: Stmt) -> Result<(), InterpreterError> {
-        let lfunction = LFunction(Function::new(FnCurried { name: name.clone(), token, param, ret: Box::new(ret) }, self.env.clone()));
+        let lfunction = self.wrap(LFunction(
+            Function::new(FnCurried { name: name.clone(), token, param, ret: Box::new(ret) }, Rc::clone(&self.env))
+        ));
         if let Some(name) = name {
-            self.env.define(name, Some(lfunction));
+            self.env.borrow_mut().define(name, Some(Rc::clone(&lfunction)));
+            lfunction.borrow_mut().function_mut().closure = Rc::clone(&self.env);
         }
         Ok(())
     }
 
     // Pass environment back to caller, hard to get lifetimes right
-    pub fn execute_block(&mut self, statements: &Vec<Stmt>, env: Env<Option<LObject>>) -> Result<(LObject, Env<Option<LObject>>), InterpreterError> {
-        let enclosing = self.env.clone();
-        self.env = env;
+    pub fn execute_block(&mut self, statements: &Vec<Stmt>, env: Rc<RefCell<Env<Option<Rc<RefCell<LObject>>>>>>) -> Result<Rc<RefCell<LObject>>, InterpreterError> {
+         let enclosing = Rc::clone(&self.env);
+         self.env = env;
 
-        let mut statements = statements.clone();
-        let last = statements.pop();
-        for stmt in statements {
-            let x = self.execute(stmt);
-            if let Err(Return(obj)) = x { // Intercept return value and handle appropriately
-                let updated_env = self.env.clone();
-                self.env = enclosing.clone();
-                return Ok((obj, updated_env))
-            } else if let Err(error) = x {
-                return Err(error)
-            }
-        }
+         let mut statements = statements.clone();
+         let last = statements.pop();
+         for stmt in statements {
+             let x = self.execute(stmt);
+             // Consider return when in block thats not a functional block
+             if let Err(Return(obj)) = x { // Intercept return value and handle appropriately
+                 self.env = enclosing.clone();
+                 return Ok(obj)
+             } else if let Err(error) = x {
+                 return Err(error)
+             }
+         }
 
-        let ret_val = if let Some(stmt) = last {
-            match stmt {
-                LStmt(ref e) => self.evaluate(e)?,
-                ReturnStmt { ref value, .. } => match value {
-                    Some(expr) => self.evaluate(expr)?,
-                    None => LUnit
-                },
-                _ => { self.execute(stmt)?; LUnit }
-            }
-        } else { LUnit };
+         let ret_val = if let Some(stmt) = last {
+             match stmt {
+                 LStmt(ref e) => self.evaluate(e)?,
+                 ReturnStmt { ref value, .. } => match value {
+                     Some(expr) => self.evaluate(expr)?,
+                     None => self.wrap(LUnit)
+                 },
+                 _ => { self.execute(stmt)?; self.wrap(LUnit) }
+             }
+         } else { self.wrap(LUnit) };
 
-        let updated_env = self.env.enclosing().clone().unwrap();
-        self.env = enclosing.clone();
-        Ok((ret_val, updated_env))
+        self.env = enclosing;
+        Ok(ret_val)
     }
 
 
     fn execute_return_stmt(&mut self, value: Option<Expr>) -> Result<(), InterpreterError> {
-        let expr = if let Some(val) = value { self.evaluate(&val)? } else { LUnit };
+        let expr = if let Some(val) = value { self.evaluate(&val)? } else { Rc::new(RefCell::new(LUnit)) };
         Err(Return(expr))
 //        panic::set_hook(Box::new(|_| {}));
 //        panic!(expr)
+    }
+
+    fn wrap<T>(&self, x: T) -> Rc<RefCell<T>> {
+        Rc::new(RefCell::new(x))
     }
 
 
@@ -168,98 +182,141 @@ impl Interpreter {
 //     }
 // }
 
-    pub fn evaluate(&mut self, expr: &Expr) -> Result<LObject, InterpreterError> {
+    pub fn evaluate(&mut self, expr: &Expr) -> Result<Rc<RefCell<LObject>>, InterpreterError> {
         match expr {
-            EBinary { operator, left, ref right}  => match operator.ttype {
-                TokenType::Plus  => Ok(LNumber(self.evaluate(left)?.number() + self.evaluate(right)?.number())),
-                TokenType::Minus => Ok(LNumber(self.evaluate(left)?.number() - self.evaluate(right)?.number())),
-                TokenType::Star  => Ok(LNumber(self.evaluate(left)?.number() * self.evaluate(right)?.number())),
-                TokenType::Slash => Ok(LNumber(self.evaluate(left)?.number() / self.evaluate(right)?.number())),
-                TokenType::Caret => Ok(LNumber(f64::powf(self.evaluate(left)?.number(), self.evaluate(right)?.number()))),
-                TokenType::DoubleEqual => Ok(LBool(self.evaluate(left)? == self.evaluate(right)?)),
-                TokenType::BangEqual => Ok(LBool(self.evaluate(left)? != self.evaluate(right)?)),
-                TokenType::Less => Ok(LBool(self.evaluate(left)?.number() < self.evaluate(right)?.number())),
-                TokenType::LessEqual => Ok(LBool(self.evaluate(left)?.number() <= self.evaluate(right)?.number())),
-                TokenType::Greater => Ok(LBool(self.evaluate(left)?.number() > self.evaluate(right)?.number())),
-                TokenType::GreaterEqual => Ok(LBool(self.evaluate(left)?.number() >= self.evaluate(right)?.number())),
-                _ => unreachable!()
-            },
+            EBinary { operator, left, right}  => self.evaluate_binary(operator, left, right),
             ELogic { operator, left, right} => {
                 // Short circuit
                 let lobj = self.evaluate(left)?;
                 if operator.ttype == TokenType::DoubleAmpersand {
-                    if lobj.boolean() == false { return Ok(lobj) }
+                    if *lobj.borrow_mut().boolean_mut() == false { return Ok(lobj) }
                 } else if operator.ttype == TokenType::DoublePipe {
-                    if lobj.boolean() == true { return Ok(lobj) }
+                    if *lobj.borrow_mut().boolean_mut() == true { return Ok(lobj) }
                 }
                 self.evaluate(right)
             }
             EUnary{ operator, operand} => match operator.ttype {
-                TokenType::Minus => Ok(LNumber(-self.evaluate(operand)?.number())),
+                TokenType::Minus => {
+                    let obj = self.evaluate(operand)?;
+                    *obj.borrow_mut().number_mut() = -*obj.borrow_mut().number_mut();
+                    Ok(obj)
+                },
                 _ => unreachable!()
             },
             ELiteral(token) => Ok(Interpreter::literal_to_l_object(token)),
             EVariable { name, ..} => self.evaluate_variable(name),
-            ETuple(xs) => Ok(LTuple(xs.iter().map(|x| self.evaluate(x)).collect::<Result<Vec<LObject>, _>>()?)),
+            ETuple(_, xs) =>
+                Ok(Rc::new(RefCell::new(LTuple(xs.iter().map(|x| self.evaluate(x)).collect::<Result<Vec<Rc<RefCell<LObject>>>, _>>()?)))),
             EApplication { token, callee, arg } => self.evaluate_curried_application(token, callee, arg),
             EAssignment { lvalue, expr} => self.evaluate_assignment(lvalue, expr),
-            EBlock(xs) => Ok(self.execute_block(&xs, self.env.clone())?.0),
+            EBlock(xs) => self.execute_block(&xs, Rc::new(RefCell::new(Env::new(Some(self.env.clone()))))),
             EIf { token, condition, left, right } => self.evaluate_if(token, condition, left, right),
-            ERecord(xs) => self.evaluate_record(xs),
+            ERecord(_, xs) => self.evaluate_record(xs),
+            EGet { name, expr } => self.evaluate_get_expr(name, expr),
+            ESet { name, expr, value } => self.evaluate_set_expr(name, expr, value),
             _ => Err(InterpreterError::from(LError::new("Unknown expr type".to_string(), 0, 0)))
         }
     }
 
-    fn evaluate_record(&mut self, xs: &Vec<Pair<Expr>>) -> Result<LObject, InterpreterError> {
-        let names = xs.iter().map(|x| &x.name).collect::<Vec<&String>>();
-        let mut pairs = vec![];
-        for (i, expr) in xs.iter().map(|x| &x.value).enumerate() {
-            pairs.push(Pair::new(names[i].clone(), self.evaluate(expr)?));
+    fn evaluate_binary(&mut self, operator: &Token, left: &Expr, right: &Expr) -> Result<Rc<RefCell<LObject>>, InterpreterError> {
+        let l = self.evaluate(left)?;
+        let r = self.evaluate(right)?;
+        let num_ops = vec![Star, Plus, Minus, Slash, Caret];
+        let cmp_ops = vec![Greater, GreaterEqual, Less, LessEqual];
+        let eq_ops = vec![DoubleEqual, BangEqual];
+        if num_ops.contains(&operator.ttype) {
+            let res = match operator.ttype {
+                Plus => self.wrap(LNumber(l.borrow().number() + r.borrow().number())),
+                Minus => self.wrap(LNumber(l.borrow().number() - r.borrow().number())),
+                Star => self.wrap(LNumber(l.borrow().number() * r.borrow().number())),
+                Slash => self.wrap(LNumber(l.borrow().number() / r.borrow().number())),
+                _ => panic!()
+            };
+            Ok(res)
+        } else if cmp_ops.contains(&operator.ttype) {
+            let b = match operator.ttype {
+                Greater => self.wrap(LBool(l.borrow().number() > r.borrow().number())),
+                GreaterEqual => self.wrap(LBool(l.borrow().number() >= r.borrow().number())),
+                LessEqual => self.wrap(LBool(l.borrow().number() <= r.borrow().number())),
+                Less => self.wrap(LBool(l.borrow().number() < r.borrow().number())),
+                _ => panic!()
+            };
+            Ok(b)
+        } else if eq_ops.contains(&operator.ttype) {
+            let b = match operator.ttype {
+                DoubleEqual => self.wrap(LBool(*l == *r)),
+                BangEqual => self.wrap(LBool(*l == *r)),
+                _ => panic!()
+            };
+            Ok(b)
+        } else {
+            panic!()
         }
-        Ok(LRecord(pairs))
     }
 
-    fn evaluate_variable(&mut self, name: &Token) -> Result<LObject, InterpreterError> {
-        match self.env.resolve(name) {
+    fn evaluate_get_expr(&mut self, name: &Token, expr: &Expr) -> Result<Rc<RefCell<LObject>>, InterpreterError> {
+        match self.evaluate(expr)? {
+//            LRecord(xs) => {
+//                Ok(xs.get(&name.lexeme).unwrap().clone())
+//            },
+            _ => unreachable!(),
+        }
+    }
+
+    fn evaluate_set_expr(&mut self, name: &Token, expr: &Expr, value: &Expr) -> Result<Rc<RefCell<LObject>>, InterpreterError> {
+//        match self.evaluate(expr)? {
+//            LRecord(mut xs) => {
+//                xs.insert(&name.lexeme);
+//
+//            },
+//            _ => unreachable!(),
+//        }
+        Ok(Rc::new(RefCell::new(LUnit)))
+    }
+
+    fn evaluate_record(&mut self, xs: &HashMap<String, Expr>) -> Result<Rc<RefCell<LObject>>, InterpreterError> {
+        let mut map = HashMap::new();
+        for (k, v) in xs {
+            map.insert(k.clone(), self.evaluate(v)?);
+        }
+        Ok(Rc::new(RefCell::new(LRecord(map))))
+    }
+
+    fn evaluate_variable(&mut self, name: &Token) -> Result<Rc<RefCell<LObject>>, InterpreterError> {
+        match self.env.borrow().resolve(name) {
             Ok(val) => Ok(val.unwrap()),
             Err(lerror) => Err(InterpreterError::from(lerror))
         }
     }
 
-    fn evaluate_if(&mut self, token: &Token, condition: &Expr, left: &Expr, right: &Expr) -> Result<LObject, InterpreterError> {
+    fn evaluate_if(&mut self, token: &Token, condition: &Expr, left: &Expr, right: &Expr) -> Result<Rc<RefCell<LObject>>, InterpreterError> {
         let cond = self.evaluate(condition)?;
-        if cond.boolean() {
-            self.evaluate(left)
-        } else {
-            self.evaluate(right)
-        }
+        if *cond.borrow_mut().boolean_mut() { self.evaluate(left) }
+        else { self.evaluate(right) }
     }
 
-    fn literal_to_l_object(literal: &Token) -> LObject {
-        match literal.ttype {
+    fn literal_to_l_object(literal: &Token) -> Rc<RefCell<LObject>> {
+        let obj = match literal.ttype {
             TokenType::True => LBool(true),
             TokenType::False => LBool(false),
             TokenType::Number => LNumber(literal.lexeme.parse::<f64>().expect("Failed to parse float")),
             _ => panic!("Invalid literal conversion")
-        }
+        };
+        Rc::new(RefCell::new(obj))
     }
 
-    fn evaluate_assignment(&mut self, lvalue: &Token, expr: &Expr) -> Result<LObject, InterpreterError> {
+    fn evaluate_assignment(&mut self, lvalue: &Token, expr: &Expr) -> Result<Rc<RefCell<LObject>>, InterpreterError> {
         let obj = self.evaluate(expr);
-        self.env.update(&lvalue.lexeme, Some(obj.clone()?));
+        self.env.borrow_mut().update(&lvalue.lexeme, Some(obj.clone()?));
         obj
     }
 
-    fn evaluate_curried_application(&mut self, token: &Token, callee: &Expr, arg: &Expr) -> Result<LObject, InterpreterError> {
-        let mut callee_obj = self.evaluate(callee)?;
+    fn evaluate_curried_application(&mut self, token: &Token, callee: &Expr, arg: &Expr) -> Result<Rc<RefCell<LObject>>, InterpreterError> {
+        let callee_obj = self.evaluate(callee)?;
         let arg_obj = self.evaluate(arg)?;
-        let res = callee_obj.function().invoke(self, &arg_obj);
-        // Manually update closure variables as taken out a clone from the env
-        if let EVariable { name, ..} = callee {
-            self.env.update(&name.lexeme, Some(callee_obj))
-        }
-        res
-
+        if let LFunction(ref f) = *Rc::clone(&callee_obj).borrow() {
+            f.invoke(arg_obj, self)
+        } else { panic!("Non function") }
     }
 
 //    fn evaluate_application(&mut self, token: &Token, callee: &Expr, args: &Vec<Expr>) -> Result<LObject, LError> {

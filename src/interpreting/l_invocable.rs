@@ -1,6 +1,7 @@
 use crate::interpreting::{Interpreter, LObject, InterpreterError};
-use crate::errors::LError;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 pub trait LInvocable {
-    fn invoke(&mut self, interpreter: &mut Interpreter, arg: &LObject) -> Result<LObject, InterpreterError>;
+    fn invoke(&self, arg: Rc<RefCell<LObject>>, interpreter: &mut Interpreter) -> Result<Rc<RefCell<LObject>>, InterpreterError>;
 }

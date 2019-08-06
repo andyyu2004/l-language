@@ -1,18 +1,19 @@
 use std::collections::HashMap;
 use crate::errors::LError;
 use crate::lexing::Token;
-
+use std::cell::RefCell;
+use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Env<T> where T : Clone {
     vars: HashMap<String, T>,
-    outer: Box<Option<Env<T>>>
+    outer: Option<Rc<RefCell<Env<T>>>>
 }
 
 impl<T> Env<T> where T : Clone {
 
-    pub fn new(outer: Option<Env<T>>) -> Env<T> {
-        Env { vars: HashMap::new() , outer: Box::new(outer) }
+    pub fn new(outer: Option<Rc<RefCell<Env<T>>>>) -> Env<T> {
+        Env { vars: HashMap::new() , outer }
     }
 
     // Hashmap::insert():
@@ -25,26 +26,22 @@ impl<T> Env<T> where T : Clone {
     }
 
     // Assignment validity is checked by static analysis
-    pub fn update(&mut self, key: &String, value: T) {
-        match self.vars.get(key) {
-            Some(x) => { self.vars.insert(key.to_string(), value); },
-            None => match *self.outer {
-                Some(ref mut env) => env.update(key, value),
+    pub fn update(&mut self, key: &str, value: T) {
+        match self.vars.get_mut(key) {
+            Some(x) => *x = value,
+            None => match &self.outer {
+                Some(env) => env.borrow_mut().update(key, value),
                 None => panic!("Failed in env update, var not found in any scope")
             }
         };
-    }
-
-    pub fn enclosing(&self) -> &Option<Env<T>> {
-        &*self.outer
     }
 
     // Climb the cactus stack to resolve bindings
     pub fn resolve(&self, key: &Token) -> Result<T, LError> {
         match self.vars.get(&key.lexeme) {
             Some(x) => Ok(x.clone()),
-            None => match *self.outer {
-                Some(ref env) => env.resolve(key),
+            None => match &self.outer {
+                Some(env) => env.borrow().resolve(key),
                 None => Err(LError::from_token(format!("Undefined variable '{}'", key.lexeme), key))
             }
         }
@@ -54,32 +51,6 @@ impl<T> Env<T> where T : Clone {
         self.vars.get(key)
     }
 }
-
-//impl Env<Option<LObject>>  {
-//    pub fn resolve_obj(&self, key: &Token) -> Result<Option<LObject>, LError> {
-//        match self.vars.get(&key.lexeme) {
-//            Some(x) => if let Some(LFunction(_)) = x { // if is function, return the one higher up
-//                match *self.outer {
-//                    Some(ref env) => {
-//                        env.resolve(key)
-//                    },
-//                    None => Ok(x.clone())
-//                }
-//            } else {
-//                Ok(x.clone())
-//            },
-//            None => match *self.outer {
-//                Some(ref env) => env.resolve_obj(key),
-//                None => Err(LError::from_token(format!("Undefined variable '{}'", key.lexeme), key))
-//            }
-//        }
-//    }
-//}
-
-
-
-
-
 
 
 

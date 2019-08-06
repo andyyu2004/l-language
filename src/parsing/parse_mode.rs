@@ -1,5 +1,5 @@
 #[derive(Debug, Copy, Clone)]
-pub enum ParseMode {
+pub enum Mode {
     Interactive,
     Interpreted,
 }

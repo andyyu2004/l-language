@@ -29,11 +29,18 @@ impl Lexer {
                 ' ' => {},
                 ',' => tokens.push(self.create_token(TokenType::Comma, char::to_string(&c))),
                 ':' => tokens.push(self.create_token(TokenType::Colon, char::to_string(&c))),
-                '+' => tokens.push(self.create_token(TokenType::Plus, char::to_string(&c))),
+                '+' => if self.match_next('=') {
+                    tokens.push(self.create_token(TokenType::PlusEqual, "+".to_string()))
+                } else {
+                    tokens.push(self.create_token(TokenType::Plus, char::to_string(&c)))
+                },
                 '-' => if self.match_next('>') {
                     tokens.push(self.create_token(TokenType::RightArrow, "->".to_string()));
-                    self.inc_indexes();
-                } else { tokens.push(self.create_token(TokenType::Minus, char::to_string(&c))) },
+                } else if self.match_next('=') {
+                    tokens.push(self.create_token(TokenType::MinusEqual, "-".to_string()))
+                } else {
+                    tokens.push(self.create_token(TokenType::Minus, char::to_string(&c)))
+                },
                 '*' => tokens.push(self.create_token(TokenType::Star, char::to_string(&c))),
                 '^' => tokens.push(self.create_token(TokenType::Caret, char::to_string(&c))),
                 '{' => tokens.push(self.create_token(TokenType::LBrace, char::to_string(&c))),
@@ -51,32 +58,26 @@ impl Lexer {
                 },
                 '=' => if self.match_next('=') {
                     tokens.push(self.create_token(TokenType::DoubleEqual, "==".to_string()));
-                    self.inc_indexes();
                 } else if self.match_next('>') {
                     tokens.push(self.create_token(TokenType::RightFatArrow, "=>".to_string()));
-                    self.inc_indexes();
                 } else { tokens.push(self.create_token(TokenType::Equal, char::to_string(&c))); },
                 '<' => if self.match_next('=') {
                     tokens.push(self.create_token(TokenType::LessEqual, "<=".to_string()));
-                    self.inc_indexes();
                 } else {
                     tokens.push(self.create_token(TokenType::Less, char::to_string(&c)))
                 },
                 '>' => if self.match_next('=') {
                     tokens.push(self.create_token(TokenType::GreaterEqual, ">=".to_string()));
-                    self.inc_indexes();
                 } else {
                     tokens.push(self.create_token(TokenType::Greater, char::to_string(&c)))
                 },
                 '!' => if self.match_next('=') {
                     tokens.push(self.create_token(TokenType::BangEqual, "!=".to_string()));
-                    self.inc_indexes();
                 } else {
                     tokens.push(self.create_token(TokenType::Bang, char::to_string(&c)))
                 },
                 '|' => if self.match_next('|') {
                     tokens.push(self.create_token(TokenType::DoublePipe, "||".to_string()));
-                    self.inc_indexes();
                 } else {
                     tokens.push(self.create_token(TokenType::Pipe, char::to_string(&c)))
                 },
@@ -85,6 +86,12 @@ impl Lexer {
                     self.inc_indexes();
                 } else {
                     tokens.push(self.create_token(TokenType::Ampersand, char::to_string(&c)))
+                },
+                '.' => if self.match_next('.') {
+                    tokens.push(self.create_token(TokenType::DoubleDot, "..".to_string()));
+                    self.inc_indexes();
+                } else {
+                    tokens.push(self.create_token(TokenType::Dot, char::to_string(&c)))
                 },
                 '0'...'9' => {
                     let start_col = self.col;
@@ -114,7 +121,7 @@ impl Lexer {
             }
             self.inc_indexes();
         }
-        tokens.push(self.create_token(TokenType::EOF, String::new()));
+        tokens.push(self.create_token(TokenType::EOF, "EOF".to_string()));
         // Declare accumulator locally to allow move out
         if errors.is_empty() { Ok(tokens) }
         else { Err(errors) }
@@ -154,12 +161,14 @@ impl Lexer {
             acc.push(self.peek());
             self.inc_indexes();
         }
-        if self.match1('.') && self.peek().is_numeric() { // self.lookahead(1).map_or(false, |x| x.is_numeric()) {
-            acc.push(self.previous());
-            while !self.at_end() && self.peek().is_numeric() {
-                acc.push(self.peek());
-                self.inc_indexes();
-            }
+        if self.match1('.') {
+            if !self.at_end() && self.peek().is_numeric() {
+                acc.push(self.previous());
+                while !self.at_end() && self.peek().is_numeric() {
+                    acc.push(self.peek());
+                    self.inc_indexes();
+                }
+            } else { self.i -= 1; }
         }
         acc
 
@@ -194,9 +203,12 @@ impl Lexer {
         } else { false }
     }
 
-    // Does NOT increment
     fn match_next(&mut self, c: char) -> bool {
-        self.lookahead(1).map_or(false, |x| x == c)
+//        self.lookahead(1).map_or(false, |x| x == c) // this does not increment
+        if self.lookahead(1).map_or(false, |x| x == c) {
+            self.inc_indexes();
+            true
+        } else { false }
     }
 
 //    fn prev(&self) -> char {

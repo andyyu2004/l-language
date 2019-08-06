@@ -1,14 +1,16 @@
 //use crate::L;
 use crate::lexing::Token;
 use crate::lexing::token::TokenType;
-use crate::parsing::{Expr, Stmt, ParseMode};
+use crate::parsing::{Expr, Stmt, Mode};
 use crate::errors::LError;
 use crate::types::LType;
 use crate::types::l_types::Pair;
 use crate::parsing::stmt::Stmt::{FnStmt, LetStmt, FnCurried, VarStmt, ReturnStmt, TypeAlias, WhileStmt};
-use crate::types::l_types::LType::{TTuple, TUnit, TNum, TBool, TRecord, TName};
-use crate::parsing::expr::Expr::{EApplication, EBinary, EUnary, ELiteral, EVariable, EAssignment, EIf, EBlock, ERecord, ELogic};
+use crate::types::l_types::LType::{TTuple, TRecord, TName};
+use crate::parsing::expr::Expr::{EApplication, EBinary, EUnary, ELiteral, EVariable, EAssignment, EIf, EBlock, ERecord, ELogic, EGet, ESet};
 use std::fmt::{Display};
+use std::collections::HashMap;
+use crate::lexing::token::TokenType::{Plus, Minus};
 
 /*
 <expr> ::= <addition>
@@ -24,13 +26,13 @@ use std::fmt::{Display};
 pub struct Parser {
     tokens: Vec<Token>,
     i: usize,
-    mode: ParseMode
+    mode: Mode
 }
 
 // Utility
 impl Parser {
 
-    pub fn new(tokens: Vec<Token>, mode: ParseMode) -> Parser {
+    pub fn new(tokens: Vec<Token>, mode: Mode) -> Parser {
         Parser { tokens, mode, i: 0 }
     }
 
@@ -328,11 +330,28 @@ impl Parser {
         let expr = self.parse_block_expr()?;
         if self.match1(TokenType::Equal) {
             let token = self.previous().clone();
-            let rvalue = self.parse_assignment()?;
+            let right = self.parse_assignment()?;
             return if let EVariable { name } = &expr {
-                Ok(EAssignment { lvalue: name.clone(), expr: Box::new(rvalue) })
+                Ok(EAssignment { lvalue: name.clone(), expr: Box::new(right) })
+            } else if let EGet { name, expr } = &expr {
+                Ok(ESet { name: name.clone(), expr: expr.clone(), value: Box::new(right) })
             } else {
                 Err(LError::from_token(format!("Cannot assign to {}, not an l-value", expr), &token))
+            }
+        } else if self.r#match(&[TokenType::PlusEqual, TokenType::MinusEqual]) {
+            let mut operator = self.previous().clone();
+            operator.ttype = match operator.ttype {
+                TokenType::PlusEqual => Plus,
+                TokenType::MinusEqual => Minus,
+                _ => unreachable!()
+            };
+            let right = self.parse_assignment()?;
+            return if let EVariable { name } = &expr {
+                Ok(EAssignment { lvalue: name.clone(), expr: Box::new(EBinary { operator, left: Box::new(expr), right: Box::new(right) }) })
+            } else if let EGet { name, expr } = &expr {
+                Ok(ESet { name: name.clone(), expr: expr.clone(), value: Box::new(right) })
+            } else {
+                Err(LError::from_token(format!("Cannot assign to {}, not an l-value", expr), &operator))
             }
         }
         Ok(expr)
@@ -461,7 +480,7 @@ impl Parser {
     // <exp> ::= <primary> ^ <exp>
     fn parse_exponent(&mut self) -> Result<Expr, LError> {
 //        println!("Exp");
-        let mut expr = self.parse_curried_application();
+        let mut expr = self.parse_app_dot();
         while self.r#match1(TokenType::Caret) {
             let operator = self.previous().clone();
             let right = self.parse_exponent();
@@ -482,16 +501,69 @@ impl Parser {
 //    }
 
     // <app> = <primary> { <primary> }
-    fn parse_curried_application(&mut self) -> Result<Expr, LError> {
+//    fn parse_curried_application(&mut self) -> Result<Expr, LError> {
+//        let mut expr = self.parse_dot();
+//        while let Ok(arg) = self.parse_dot() {
+//            expr = Ok(EApplication { token: self.current().clone(), callee: Box::new(expr?), arg: Box::new(arg) })
+//        }
+//        expr
+//    }
+
+//    fn parse_dot(&mut self) -> Result<Expr, LError> {
+//        let mut expr = self.parse_primary();
+//        while self.match1(TokenType::Dot) {
+//            let name = self.expect(TokenType::Identifier)?.clone();
+//            expr = Ok(EGet { name, expr: Box::new(expr?) });
+//        }
+//        expr
+//    }
+
+    fn parse_app_dot(&mut self) -> Result<Expr, LError> {
         let mut expr = self.parse_primary();
-        while let Ok(arg) = self.parse_primary() {
-            expr = Ok(EApplication { token: self.current().clone(), callee: Box::new(expr?), arg: Box::new(arg) })
+        loop {
+            if let Ok(arg) = self.parse_primary() {
+                expr = Ok(EApplication { token: self.current().clone(), callee: Box::new(expr?), arg: Box::new(arg) })
+            } else if self.match1(TokenType::Dot) {
+                let name = self.expect(TokenType::Identifier)?.clone();
+                expr = Ok(EGet { name, expr: Box::new(expr?) });
+            } else {
+                break;
+            }
         }
         expr
     }
 
+
+    fn parse_primary(&mut self) -> Result<Expr, LError> {
+        // Parsing as parens will fail if intended to be tuple, and unary tuples probably aren't useful
+        if self.r#match1(TokenType::LParen) {
+            let backtrack = self.i;
+            let expr = self.parse_expression();
+            if expr.is_err() || self.expect(TokenType::RParen).is_err() {
+                self.i = backtrack;
+                let token = self.current().clone();
+                return Ok(Expr::ETuple(token, self.parse_tuple(&Parser::parse_expression)?))
+            }
+            expr
+//            Ok(Expr::Grouping(Box::new(expr?))) // dont think this is explicitly required
+        } else if self.match1(TokenType::Identifier) {
+            Ok(EVariable { name: self.previous().clone() })
+        } else if self.r#match(&[TokenType::False, TokenType::True, TokenType::Number]) {
+            Ok(ELiteral(self.previous().clone()))
+        } else if self.match1(TokenType::Record) {
+            self.expect(TokenType::LBrace)?;
+            let token = self.previous().clone();
+            Ok(ERecord(token, self.parse_record(&Parser::parse_expression)?))
+//            self.parse_record(&Parser::parse_expression).map(ERecord)
+        } else {
+            let t = self.current();
+            Err(LError::from_token(format!("unexpected token: {}", t), t))
+        }
+    }
+
+
     fn parse_tuple<F, T>(&mut self, f: &F) -> Result<Vec<T>, LError>
-            where F: Fn(&mut Self) -> Result<T, LError> {
+        where F: Fn(&mut Self) -> Result<T, LError> {
         let mut v = Vec::<T>::new();
         if self.current().ttype != TokenType::RParen {
             while { // Cheap do-while loop
@@ -503,27 +575,9 @@ impl Parser {
         Ok(v)
     }
 
-    // Expect opening LBrace to be consumed
-    fn parse_record<F, T>(&mut self, f: &F) -> Result<Vec<Pair<T>>, LError>
-            where F: Fn(&mut Self) -> Result<T, LError>, T : Display {
-        let mut v = vec![];
-        while {
-            v.push(self.parse_record_entry(f)?);
-            self.match1(TokenType::Comma)
-        } {}
-        self.expect(TokenType::RBrace)?;
-        Ok(v)
-    }
 
-    fn parse_record_entry<F, T>(&mut self, f: &F) -> Result<Pair<T>, LError>
-                where F: Fn(&mut Self) -> Result<T, LError>, T : Display {
-        let name = self.expect(TokenType::Identifier)?.lexeme.clone();
-        self.expect(TokenType::Colon)?;
-        let value = f(self)?;
-        Ok(Pair::new(name, value))
-    }
 
-//    fn parse_tuple(&mut self) -> Result<Vec<Expr>, LError> {
+    //    fn parse_tuple(&mut self) -> Result<Vec<Expr>, LError> {
 //        let mut v = Vec::<Expr>::new();
 //        if self.current().ttype != TokenType::RParen {
 //            while { // Cheap do-while loop
@@ -535,33 +589,29 @@ impl Parser {
 //        Ok(v)
 //    }
 
-    fn parse_primary(&mut self) -> Result<Expr, LError> {
-        // Parsing as parens will fail if intended to be tuple, and unary tuples probably aren't useful
-        if self.r#match1(TokenType::LParen) {
-            let backtrack = self.i;
-            let expr = self.parse_expression();
-            if expr.is_err() || self.expect(TokenType::RParen).is_err() {
-                self.i = backtrack;
-                return Ok(Expr::ETuple(self.parse_tuple(&Parser::parse_expression)?))
-            }
-            expr
-//            Ok(Expr::Grouping(Box::new(expr?))) // dont think this is explicitly required
-        } else if self.match1(TokenType::Number) {
-            let token = self.previous().clone();
-            Ok(ELiteral(token))
-        } else if self.match1(TokenType::Identifier) {
-            Ok(EVariable { name: self.previous().clone() })
-        } else if self.match1(TokenType::True) {
-            Ok(ELiteral(self.previous().clone()))
-        } else if self.match1(TokenType::False){
-            Ok(ELiteral(self.previous().clone()))
-        } else if self.match1(TokenType::Record) {
-            self.expect(TokenType::LBrace)?;
-            self.parse_record(&Parser::parse_expression).map(ERecord)
-        } else {
-            let t = self.current();
-            Err(LError::from_token(format!("unexpected token: {}", t), t))
-        }
+    // Expect opening LBrace to be consumed
+    fn parse_record<F, T>(&mut self, f: &F) -> Result<HashMap<String, T>, LError>
+        where F: Fn(&mut Self) -> Result<T, LError>, T : Display {
+        let mut v = HashMap::new();
+        while {
+            let current_line = self.current().line;
+            let current_col = self.current().col;
+            let pair = self.parse_record_entry(f)?;
+            if v.insert(pair.name, pair.value).is_some() {
+                return Err(LError::new("All fields in record must be unique".to_string(), current_line, current_col))
+            };
+            self.match1(TokenType::Comma)
+        } {}
+        self.expect(TokenType::RBrace)?;
+        Ok(v)
+    }
+
+    fn parse_record_entry<F, T>(&mut self, f: &F) -> Result<Pair<T>, LError>
+        where F: Fn(&mut Self) -> Result<T, LError>, T : Display {
+        let name = self.expect(TokenType::Identifier)?.lexeme.clone();
+        self.expect(TokenType::Colon)?;
+        let value = f(self)?;
+        Ok(Pair::new(name, value))
     }
 
 

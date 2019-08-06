@@ -29,6 +29,7 @@ impl Display for LError {
 //    }
 //}
 
+
 impl LError {
 
     pub(crate) fn from_token(message: String, token: &Token) -> LError {

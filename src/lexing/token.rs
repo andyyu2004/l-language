@@ -37,6 +37,7 @@ pub enum TokenType {
     Semicolon,
     Pipe, DoublePipe,
     Ampersand, DoubleAmpersand,
+    PlusEqual, MinusEqual, StarEqual, SlashEqual, Modulo,
     Var,
     Let,
     Print,
@@ -46,6 +47,7 @@ pub enum TokenType {
     Fn,
     Typename,
     Return,
+    Dot, DoubleDot,
     If, Else, While,
     Record, Type,
     RightArrow, RightFatArrow

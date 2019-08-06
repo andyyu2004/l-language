@@ -17,14 +17,13 @@ mod static_analysis;
 
 use std::{env, fs, process};
 use crate::types::type_checker::TypeChecker;
+use crate::parsing::Mode;
 use crate::static_analysis::StaticAnalyser;
-use crate::parsing::ParseMode;
-
 
 fn main() {
 
     let args = env::args().collect::<Vec<String>>();
-    
+
     if args.len() == 2 {
         let path = &args[1];
         match fs::read_to_string(path) {
@@ -43,7 +42,7 @@ fn main() {
     let mut analyser = StaticAnalyser::new();
     let mut typechecker = TypeChecker::new();
 //    let mut env = Env::new(None);
-    let mut interpreter = Interpreter::new();
+    let mut interpreter = Interpreter::new(Mode::Interactive);
 
 
     loop {
@@ -98,7 +97,7 @@ fn main() {
 
 //        println!("{:#?}", tokens);
 
-        let mut parser = Parser::new(tokens, ParseMode::Interactive);
+        let mut parser = Parser::new(tokens, Mode::Interactive);
 
         let statements = match parser.parse() {
             Ok(x) => x,
@@ -153,12 +152,12 @@ fn main() {
 }
 
 // Can't bring upper functionality into function as requires break and continue
-fn execute(input: String) {
+pub fn execute(input: String) {
 
     let mut analyser = StaticAnalyser::new();
     let mut typechecker = TypeChecker::new();
 //    let mut env = Env::new(None);
-    let mut interpreter = Interpreter::new();
+    let mut interpreter = Interpreter::new(Mode::Interpreted);
 
     let mut lexer = Lexer::new(input, Keywords::map());
 
@@ -171,7 +170,7 @@ fn execute(input: String) {
         }
     };
 
-    let mut parser = Parser::new(tokens, ParseMode::Interpreted);
+    let mut parser = Parser::new(tokens, Mode::Interpreted);
     let statements = match parser.parse() {
         Ok(s) => s,
         Err(errors) => {
