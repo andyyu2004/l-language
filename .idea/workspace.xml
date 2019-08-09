@@ -5,31 +5,38 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="87d7f893-1b77-4ef4-9c5e-a4c1289b1105" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/tests/mod.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/statistic.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/generation/function_generation.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/generation/mod.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/interpreting/objects/l_struct.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/interpreting/objects/l_tuple.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/interpreting/objects/l_variant.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/interpreting/objects/mod.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/interpreting/pattern_matching/matchable.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/interpreting/pattern_matching/mod.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/interpreting/pattern_matching/pattern.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/interpreterhistory.txt" beforeDir="false" afterPath="$PROJECT_DIR$/interpreterhistory.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/errors/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/errors/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/interpreting/env.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/interpreting/env.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/interpreting/interpreter.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/interpreting/interpreter.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/interpreting/interpreter_error.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/interpreting/interpreter_error.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/interpreting/l_function.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/interpreting/l_function.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/interpreting/l_invocable.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/interpreting/l_invocable.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/interpreting/l_object.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/interpreting/l_object.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/interpreting/l_function.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/interpreting/objects/l_function.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/interpreting/l_invocable.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/interpreting/objects/l_invocable.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/interpreting/l_object.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/interpreting/objects/l_object.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/interpreting/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/interpreting/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/lexing/keywords.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/lexing/keywords.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/lexing/lexer.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/lexing/lexer.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/lexing/token.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/lexing/token.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/main.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/parsing/expr.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/parsing/expr.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/parsing/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/parsing/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/parsing/parse_mode.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/parsing/parse_mode.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/parsing/parser.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/parsing/parser.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/parsing/patterns.rs" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/src/parsing/stmt.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/parsing/stmt.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/static_analysis/analyser.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/static_analysis/static_analyser.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/static_analysis/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/static_analysis/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/static_analysis/static_analyser.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/static_analysis/static_analyser.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/types/l_types.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/types/l_types.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/types/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/types/mod.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/types/type_checker.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/types/type_checker.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests.l" beforeDir="false" afterPath="$PROJECT_DIR$/tests.l" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/z.l" beforeDir="false" afterPath="$PROJECT_DIR$/z.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/z.txt" beforeDir="false" afterPath="$PROJECT_DIR$/z.txt" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -58,13 +65,15 @@
     <property name="org.rust.cargo.project.model.PROJECT_DISCOVERY" value="true" />
     <property name="org.rust.hideDetachedFileNotifications/home/andy/programming/rust/L/tests/mod.rs" value="true" />
     <property name="org.rust.hideDetachedFileNotifications/home/andy/programming/rust/L/z.rs" value="true" />
-    <property name="settings.editor.selected.configurable" value="preferences.pluginManager" />
+    <property name="settings.editor.selected.configurable" value="reference.settings.project.statistic.project.settings" />
   </component>
   <component name="RecentsManager">
     <key name="MoveClassesOrPackagesDialog.RECENTS_KEY">
       <recent name="" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/src/interpreting/objects" />
+      <recent name="$PROJECT_DIR$/src/interpreting" />
       <recent name="$PROJECT_DIR$" />
     </key>
   </component>

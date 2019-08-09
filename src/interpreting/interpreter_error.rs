@@ -1,8 +1,8 @@
 use crate::errors::LError;
-use crate::interpreting::LObject;
 use std::fmt::{Display, Formatter, Error};
 use std::rc::Rc;
 use std::cell::RefCell;
+use crate::interpreting::objects::LObject;
 
 // Implement return using result instead of catching panic
 #[derive(Debug, Clone)]

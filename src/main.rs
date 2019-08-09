@@ -14,6 +14,7 @@ mod errors;
 mod types;
 mod internal;
 mod static_analysis;
+mod generation;
 
 use std::{env, fs, process};
 use crate::types::type_checker::TypeChecker;
@@ -40,7 +41,7 @@ fn main() {
     if rl.load_history("interpreterhistory.txt").is_err() {}
 
     let mut analyser = StaticAnalyser::new();
-    let mut typechecker = TypeChecker::new();
+    let mut typechecker = TypeChecker::new(Mode::Interactive);
 //    let mut env = Env::new(None);
     let mut interpreter = Interpreter::new(Mode::Interactive);
 
@@ -155,7 +156,7 @@ fn main() {
 pub fn execute(input: String) {
 
     let mut analyser = StaticAnalyser::new();
-    let mut typechecker = TypeChecker::new();
+    let mut typechecker = TypeChecker::new(Mode::Interpreted);
 //    let mut env = Env::new(None);
     let mut interpreter = Interpreter::new(Mode::Interpreted);
 

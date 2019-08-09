@@ -1,27 +1,31 @@
-use crate::parsing::{Expr, Stmt};
+use crate::parsing::{Expr, Stmt, Mode};
 use crate::lexing::{TokenType, Token};
 use crate::types::{LType, LTypeError};
-use crate::types::l_types::LType::{TBool, TNum, TArrow, TTuple, TUnit, TRecord};
+use crate::types::l_types::LType::{TBool, TNum, TArrow, TTuple, TUnit, TRecord, TData, TVariant, TTop, TNothing};
 use crate::types::l_types::Pair;
-use crate::parsing::expr::Expr::{EBinary, ELiteral, EVariable, ETuple, EApplication, EAssignment, EBlock, EIf, ERecord, ELogic, EGet, ESet};
+use crate::parsing::expr::Expr::{EBinary, ELiteral, EVariable, ETuple, EApplication, EAssignment, EBlock, EIf, ERecord, ELogic, EGet, ESet, EDataConstructor, EMatch, EIfLet};
 use crate::interpreting::Env;
-use crate::types::LTypeError::{TypeError, NonFunction, InvalidDeclaration, TypeMismatch, NonExistentField, NotGettable};
-use crate::parsing::stmt::Stmt::{LStmt, FnStmt, VarStmt, LetStmt, FnCurried, ExprStmt, ReturnStmt, PrintStmt, TypeAlias, WhileStmt};
+use crate::types::LTypeError::{TypeError, NonFunction, InvalidDeclaration, TypeMismatch, NonExistentField, NotGettable, NonExistentType, NonExistentDataConstructor, BadPattern};
+use crate::parsing::stmt::Stmt::{LStmt, FnStmt, VarStmt, LetStmt, FnCurried, ExprStmt, ReturnStmt, PrintStmt, TypeAlias, WhileStmt, StructDecl, DataDecl};
 use crate::lexing::token::TokenType::{Greater, GreaterEqual, Caret, Slash, Plus, Star, LessEqual, Less, Minus, BangEqual, DoubleEqual};
+use crate::interpreting::LPattern::*;
 use std::mem::{discriminant};
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::cell::RefCell;
+use crate::interpreting::pattern_matching::LPattern;
+use itertools::Itertools;
 
 pub struct TypeChecker {
     env: Rc<RefCell<Env<LType>>>, // Variable -> Type
     types: Env<LType>, // Typename -> Type
-    curr_fn_ret_type: Option<LType>
+    curr_fn_ret_type: Option<LType>,
+    mode: Mode
 }
 
 impl TypeChecker {
 
-    pub fn new() -> TypeChecker {
+    pub fn new(mode: Mode) -> TypeChecker {
         let mut types = Env::new(None);
         types.define("Bool".to_string(), TBool);
         types.define("Int".to_string(), TNum);
@@ -30,12 +34,30 @@ impl TypeChecker {
         TypeChecker {
             env: Rc::new(RefCell::new(Env::new(None))),
             curr_fn_ret_type: None,
-            types
+            types,
+            mode
         }
     }
 }
 
 impl TypeChecker {
+
+
+    pub fn type_check(&mut self, statements: &Vec<Stmt>) -> Result<(), Vec<LTypeError>> {
+        let mut errors = Vec::<LTypeError>::new();
+        for statement in statements {
+//        if let Err(err) = type_check_statement(statement) {
+//            errors.push(err);
+//        }
+            match self.type_of_statement(statement) {
+                Err(err) => errors.push(err),
+                Ok(t) => if let Mode::Interactive = self.mode {
+                    println!("Type: {}", t)
+                }
+            }
+        }
+        if errors.is_empty() { Ok(()) } else { Err(errors) }
+    }
 
     pub fn type_of_expr(&mut self, expr: &Expr) -> Result<LType, LTypeError> {
         match expr {
@@ -45,14 +67,54 @@ impl TypeChecker {
             EApplication { token, callee, arg} => self.type_of_curry_application(token, callee, arg),
             EAssignment { lvalue, expr } => self.type_of_assignment(lvalue, expr),
             EIf { condition, left, right, token } => self.type_of_if(token, condition, left, right),
-            EBlock(xs) => self.type_of_block(xs),
+            EBlock(xs) => self.type_of_block_e(xs),
             ETuple(_, xs) => self.type_of_tuple(xs),
             ERecord(_, xs) => self.type_of_record(xs),
             ELogic { operator, left, right} => self.type_of_logical(operator, left, right),
             EGet { name, expr } => self.type_of_get(name, expr),
             ESet { name, expr, value } => self.type_of_set(name, expr, value),
+            EDataConstructor { name } => self.env.borrow().resolve(name).map_err(|e| NonExistentDataConstructor(name.clone())),
+            EMatch { token, expr, branches} => self.type_of_match(token, expr, branches),
+            EIfLet { token, pattern, scrutinee, left, right } =>
+                self.type_of_if_let(token, pattern, scrutinee, left, right),
             x => unimplemented!("Unsupported: {}", x)
         }
+    }
+
+    fn type_of_statement(&mut self, stmt: &Stmt) -> Result<LType, LTypeError> {
+        match stmt {
+            LStmt(expr) | ExprStmt(expr) | PrintStmt(expr) => self.type_of_expr(expr),
+            FnStmt { name, token, params, ret_type, body } => self.type_of_fn(name, token, params, ret_type, body),
+            FnCurried { name, param, ret, .. } => self.type_of_curried_fn(name, param, ret),
+            VarStmt { name, ltype, init}  => self.type_of_var_decl(name, ltype, init.as_ref()),
+            LetStmt { name, ltype, init} => self.type_of_var_decl(name, ltype, Some(init)),
+            ReturnStmt { token, value } => self.type_of_return(token, value),
+            TypeAlias { name, ltype } => self.define_type_alias(name, ltype),
+            WhileStmt { token, condition, body} => self.type_of_while(token, condition, body),
+            StructDecl { name, fields} => self.type_of_struct(name, fields),
+            DataDecl { name, variants} => self.type_of_data_decl(name, variants),
+            _ => panic!("Unimplented in type_check_stmt")
+        }
+    }
+
+    fn type_of_match(&mut self, token: &Token, expr: &Expr, branches: &Vec<(LPattern, Expr)>) -> Result<LType, LTypeError> {
+        let first_type = self.type_of_expr(&branches[0].1)?;
+        for (_, t) in branches {
+            if self.type_of_expr(t)? != first_type {
+                return Err(TypeMismatch(first_type, self.type_of_expr(t)?, token.clone()));
+            }
+        }
+//        if !branches.iter().all(|(_, t)| self.type_of_expr(t) == first_type)
+        Ok(first_type)
+    }
+
+    fn type_of_data_decl(&mut self, name: &Token, variants: &HashMap<String, LType>) -> Result<LType, LTypeError> {
+        self.types.define(name.lexeme.clone(), TData(name.lexeme.clone()));
+        for (k, v) in variants {
+            // Define data constructors as functions
+            self.env.borrow_mut().define(k.clone(), v.clone().map_string_to_type(&self.types)?)
+        }
+        Ok(TVariant(variants.clone()))
     }
 
     fn type_of_get(&mut self, name: &Token, expr: &Expr) -> Result<LType, LTypeError> {
@@ -69,6 +131,11 @@ impl TypeChecker {
         Ok(ltype)
     }
 
+    fn type_of_struct(&mut self, name: &Token, fields: &HashMap<String, LType>) -> Result<LType, LTypeError> {
+//        self.env.borrow_mut().define(name.lexeme.clone(), ),
+        Ok(TUnit)
+    }
+
     fn type_of_set(&mut self, name: &Token, expr: &Expr, value: &Expr) -> Result<LType, LTypeError> {
         let t_expr = self.type_of_get(name, expr)?;
         let t_value = self.type_of_expr(value)?;
@@ -76,20 +143,6 @@ impl TypeChecker {
             return Err(TypeError(t_expr, t_value, name.clone()))
         }
         Ok(t_expr)
-    }
-
-    fn type_of_statement(&mut self, stmt: &Stmt) -> Result<LType, LTypeError> {
-        match stmt {
-            LStmt(expr) | ExprStmt(expr) | PrintStmt(expr) => self.type_of_expr(expr),
-            FnStmt { name, token, params, ret_type, body } => self.type_of_fn(name, token, params, ret_type, body),
-            FnCurried { name, param, ret, .. } => self.type_of_curried_fn(name, param, ret),
-            VarStmt { name, ltype, init }  => self.type_of_var_decl(name, ltype, init.as_ref()),
-            LetStmt { name, ltype, init } => self.type_of_var_decl(name, ltype, Some(init)),
-            ReturnStmt { token, value } => self.type_of_return(token, value),
-            TypeAlias { name, ltype } => self.define_type_alias(name, ltype),
-            WhileStmt { token, condition, body } => self.type_of_while(token, condition, body),
-            _ => panic!("Unimplented in type_check_stmt")
-        }
     }
 
     fn type_of_logical(&mut self, token: &Token, left: &Expr, right: &Expr) -> Result<LType, LTypeError> {
@@ -123,7 +176,70 @@ impl TypeChecker {
         } else {
             Ok(tleft)
         }
+    }
 
+    fn type_of_if_let(&mut self, token: &Token, pattern: &LPattern, scrutinee: &Expr, left: &Vec<Stmt>, right: &Expr) -> Result<LType, LTypeError> {
+//        let ptype = self.type_of_pattern(pattern)?;
+//        println!("ptype: {}", ptype);
+        let texpr = self.type_of_expr(scrutinee)?;
+//        if ptype != texpr { return Err(TypeError(texpr, ptype, token.clone())) }
+        let mut env = Env::new(Some(Rc::clone(&self.env)));
+        let bindings = self.type_of_pattern_bindings(token, pattern, &texpr)?;
+        println!("TBindings: {:?}", bindings);
+        for (k, v) in bindings { env.define(k, v); }
+        let tleft = self.type_of_block(left, Rc::new(RefCell::new(env)))?;
+        let tright = self.type_of_expr(right)?;
+        if tleft != tright { return Err(TypeMismatch(tleft, tright, token.clone())) }
+        Ok(tright)
+    }
+
+    // Pattern and the scrutinee it is matching against
+    fn type_of_pattern_bindings(&self, token: &Token, pattern: &LPattern, ltype: &LType) -> Result<Vec<(String, LType)>, LTypeError> {
+        match pattern {
+            PVariant(name, p) => if let Some(ref p) = **p {
+                let constructor_type = if let TArrow(l, _) = self.env.borrow().resolve(name).unwrap() { *l }
+                else { ltype.clone() };
+                self.type_of_pattern_bindings(name, p, &constructor_type)
+            } else { Ok(vec![]) },
+            PRecord => Ok(vec![]),
+            PTuple(xs) => {
+                if let TTuple(ts) = ltype {
+                    Ok(xs.iter()
+                        .zip(ts)
+                        .flat_map(|(p, x)| self.type_of_pattern_bindings(token, p, x))
+                        .flatten() // flatmap doesn't leave it very flat for some reason
+                        .collect_vec()
+                    )
+                } else {
+                    Err(BadPattern(pattern.clone(), ltype.clone(), token.clone()))
+                }
+            },
+            PLiteral(x) => Ok(vec![]),
+            PIdentifier(x) => Ok(vec![(x.lexeme.clone(), ltype.clone())]),
+            PWildcard => Ok(vec![])
+        }
+    }
+
+//    fn type_of_pattern(&self, pattern: &LPattern) -> Result<LType, LTypeError> {
+//        match pattern {
+//            PIdentifier(x) => Ok(TTop),
+//            PWildcard => Ok(TTop),
+//            PRecord => Ok(TNothing),
+//            PTuple(xs) =>
+//                Ok(TTuple(xs.iter().map(|x| self.type_of_pattern(x)).collect::<Result<Vec<_>, LTypeError>>()?)),
+//            PLiteral(x) => TypeChecker::type_of_literal(x),
+//            PVariant(x) => match self.env.borrow().resolve(x) {
+//                Err(_) => Err(NonExistentDataConstructor(x.clone())),
+//                Ok(t) => Ok(self.rightmost_type(t))
+//            },
+//        }
+//    }
+
+    fn rightmost_type(&self, ltype: LType) -> LType {
+        match ltype {
+            TArrow(_, r) => self.rightmost_type(*r),
+            t => t,
+        }
     }
 
     fn type_of_variable(&mut self, name: &Token) -> Result<LType, LTypeError> {
@@ -133,19 +249,28 @@ impl TypeChecker {
         }
     }
 
-    fn type_of_block(&mut self, block: &Vec<Stmt>) -> Result<LType, LTypeError> {
+    // Default env created
+    fn type_of_block_e(&mut self, block: &Vec<Stmt>) -> Result<LType, LTypeError> {
+        self.type_of_block(block, Rc::new(RefCell::new(Env::new(Some(Rc::clone(&self.env))))))
+    }
+
+    fn type_of_block(&mut self, block: &Vec<Stmt>, env: Rc<RefCell<Env<LType>>>) -> Result<LType, LTypeError> {
+        let enclosing = Rc::clone(&self.env);
+        self.env = env;
         let mut block = block.clone();
         let last = block.pop();
         for stmt in &block {
             self.type_of_statement(stmt)?;
         }
-        match last {
+        let ret = match last {
             Some(stmt) => match stmt {
                 LStmt(ref expr) => self.type_of_expr(expr),
                 ref x => { self.type_of_statement(x)?; Ok(TUnit) }
             },
             None => Ok(TUnit)
-        }
+        };
+        self.env = enclosing;
+        ret
     }
 
     fn type_of_curry_application(&mut self, token: &Token, callee: &Expr, arg: &Expr) -> Result<LType, LTypeError> {
@@ -244,26 +369,12 @@ impl TypeChecker {
         }
     }
 
-    pub fn type_check(&mut self, statements: &Vec<Stmt>) -> Result<(), Vec<LTypeError>> {
-        let mut errors = Vec::<LTypeError>::new();
-        for statement in statements {
-//        if let Err(err) = type_check_statement(statement) {
-//            errors.push(err);
-//        }
-            match self.type_of_statement(statement) {
-                Err(err) => errors.push(err),
-                Ok(t) => println!("Type: {}", t)
-            }
-        }
-        if errors.is_empty() { Ok(()) } else { Err(errors) }
-    }
-
     fn type_of_while(&mut self, token: &Token, condition: &Expr, body: &Vec<Stmt>) -> Result<LType, LTypeError> {
         let tcond = self.type_of_expr(condition)?;
         if tcond != TBool {
             return Err(TypeError(TBool, tcond, token.clone()))
         }
-        self.type_of_block(body)?;
+        self.type_of_block_e(body)?;
         Ok(TUnit)
     }
 
@@ -330,7 +441,7 @@ impl TypeChecker {
 
         let dummy_ret = ReturnStmt { token: token.clone(), value: Some(ELiteral(token.clone())) };
         let has_explicit_ret = body.iter().any(|x| self.match_discriminant(x, &dummy_ret));
-        let block_type = self.type_of_block(body)?;
+        let block_type = self.type_of_block_e(body)?;
         if block_type != ret && !has_explicit_ret {
             return Err(TypeError(ret.clone(), block_type, token.clone()));
         }

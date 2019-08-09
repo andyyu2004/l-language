@@ -28,7 +28,12 @@ impl Lexer {
                 '\r' => { self.col = 0; self.i += 1; continue; },
                 ' ' => {},
                 ',' => tokens.push(self.create_token(TokenType::Comma, char::to_string(&c))),
-                ':' => tokens.push(self.create_token(TokenType::Colon, char::to_string(&c))),
+                '_' => tokens.push(self.create_token(TokenType::Underscore, char::to_string(&c))), // This disallows underscore starting ids also
+                ':' => if self.match_next(':') {
+                    tokens.push(self.create_token(TokenType::DoubleColon, "::".to_string()))
+                } else {
+                    tokens.push(self.create_token(TokenType::Colon, char::to_string(&c)))
+                },
                 '+' => if self.match_next('=') {
                     tokens.push(self.create_token(TokenType::PlusEqual, "+".to_string()))
                 } else {

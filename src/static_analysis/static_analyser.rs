@@ -1,8 +1,8 @@
 use crate::parsing::{Stmt, Expr};
 use crate::errors::LError;
-use crate::parsing::stmt::Stmt::{LStmt, ExprStmt, VarStmt, LetStmt, FnStmt, FnCurried, ReturnStmt, PrintStmt, TypeAlias, WhileStmt};
-use crate::interpreting::{Env};
-use crate::parsing::expr::Expr::{EVariable, EApplication, EAssignment, EBlock, EIf, ERecord, ELogic, EBinary, EGet, ETuple, ESet};
+use crate::parsing::stmt::Stmt::{LStmt, ExprStmt, VarStmt, LetStmt, FnStmt, FnCurried, ReturnStmt, PrintStmt, TypeAlias, WhileStmt, StructDecl, DataDecl};
+use crate::interpreting::{Env, LPattern};
+use crate::parsing::expr::Expr::{EVariable, EApplication, EAssignment, EBlock, EIf, ERecord, ELogic, EBinary, EGet, ETuple, ESet, EDataConstructor, EMatch, EIfLet};
 use crate::static_analysis::StaticInfo;
 use crate::static_analysis::static_info::StaticInfo::{IVariable, ILetBinding, IFunction, IEmpty};
 use crate::lexing::Token;
@@ -12,6 +12,7 @@ use std::collections::HashMap;
 use itertools::Itertools;
 use std::rc::Rc;
 use std::cell::RefCell;
+use crate::interpreting::pattern_matching::LPattern::*;
 
 enum FunctionEnv {
     None, Function
@@ -54,11 +55,17 @@ impl StaticAnalyser {
             ReturnStmt { token, value } => self.analyse_return_stmt(token, value),
             WhileStmt { condition, body, ..} => {
                 self.analyse_expr(condition)?;
-                self.analyse_block(body)
+                self.analyse_block_e(body)
             }
             TypeAlias {..} => Ok(IEmpty),
+            DataDecl { .. } => Ok(IEmpty),
+            StructDecl { name, fields} => self.analyse_struct(name, fields),
             x => unimplemented!("Unimplemented in analyse stmt {}", x)
         }
+    }
+
+    fn analyse_struct(&self, name: &Token, fields: &HashMap<String, LType>) -> Result<StaticInfo, LError> {
+        Ok(IEmpty)
     }
 
     fn analyse_expr(&mut self, expr: &Expr) -> Result<StaticInfo, LError> {
@@ -71,13 +78,52 @@ impl StaticAnalyser {
             ERecord(token, xs) => self.analyse_record(token, xs),
             ETuple(_, xs) => { for x in xs { self.analyse_expr(x)?; } ; Ok(IEmpty) }
             EAssignment { lvalue, expr } => self.analyse_assignment(lvalue, expr),
-            EBlock(xs) => self.analyse_block(xs),
+            EBlock(xs) => self.analyse_block_e(xs),
             EIf { condition, left, right, .. } => self.analyse_if(condition, left, right),
+            EIfLet { token, pattern, scrutinee, left, right } =>
+                self.analyse_if_let(token, pattern, scrutinee, left, right),
             EGet { name, expr } => self.analyse_get_expr(name, expr),
             ESet { name, expr, value} => self.analyse_set_expr(name, expr, value),
+            EMatch { token, expr, branches} => self.analyse_match(token, expr, branches),
             ELogic { operator, left, right} | EBinary { operator, left, right } =>
                 self.analyse_binary(operator, left, right),
+//            ETVariable { name } => Ok(IEmpty),
             _ => Ok(IEmpty)
+        }
+    }
+
+    fn analyse_match(&mut self, token: &Token, expr: &Expr, branches: &Vec<(LPattern, Expr)>) -> Result<StaticInfo, LError> {
+        if branches.is_empty() {
+            return Err(LError::from_token("Empty match statement".to_string(), token))
+        }
+        self.analyse_expr(expr)?;
+        let enclosing = Rc::clone(&self.env);
+        self.env = Rc::new(RefCell::new(Env::new(Some(Rc::clone(&self.env)))));
+        branches.iter().map(|(_, x)| self.analyse_expr(x)).collect::<Result<Vec<_>, LError>>()?;
+        self.env = enclosing;
+        Ok(IEmpty)
+    }
+
+    fn analyse_if_let(&mut self, token: &Token, pattern: &LPattern, scrutinee: &Expr, left: &Vec<Stmt>, right: &Expr) -> Result<StaticInfo, LError> {
+        self.analyse_expr(scrutinee)?;
+        let bindings = self.get_pattern_bindings(pattern);
+        let mut env = Env::new(Some(Rc::clone(&self.env)));
+        for (k, v) in bindings { env.define(k,  v); }
+        self.analyse_block(left, Rc::new(RefCell::new(env)))?;
+        self.analyse_expr(right)
+    }
+
+    // Returns the bindings that would occur if a pattern is matched
+    fn get_pattern_bindings(&self, pattern: &LPattern) -> Vec<(String, StaticInfo)> {
+        match pattern {
+            PVariant(name, p) => if let Some(ref p) = **p {
+                self.get_pattern_bindings(p)
+            } else { vec![] },
+            PRecord => vec![],
+            PTuple(xs) => xs.iter().flat_map(|x| self.get_pattern_bindings(x)).collect::<Vec<_>>(),
+            PLiteral(x) => vec![],
+            PIdentifier(x) => vec![(x.lexeme.clone(), IEmpty)],
+            PWildcard => vec![]
         }
     }
 
@@ -98,8 +144,16 @@ impl StaticAnalyser {
         self.analyse_expr(value)
     }
 
-    fn analyse_block(&mut self, block: &Vec<Stmt>) -> Result<StaticInfo, LError> {
+    fn analyse_block_e(&mut self, block: &Vec<Stmt>) -> Result<StaticInfo, LError> {
+        let env = Rc::new(RefCell::new(Env::new(Some(Rc::clone(&self.env)))));
+        self.analyse_block(block, env)
+    }
+
+    fn analyse_block(&mut self, block: &Vec<Stmt>, env: Rc<RefCell<Env<StaticInfo>>>) -> Result<StaticInfo, LError> {
+        let enclosing = Rc::clone(&self.env);
+        self.env = env;
         block.iter().map(|x| self.analyse_stmt(x)).collect::<Result<Vec<_>, LError>>()?;
+        self.env = enclosing;
         Ok(IEmpty)
     }
 

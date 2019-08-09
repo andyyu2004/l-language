@@ -1,11 +1,11 @@
-use crate::interpreting::{LInvocable, LObject, Interpreter, Env, InterpreterError};
+use crate::interpreting::{Interpreter, Env, InterpreterError};
 use crate::parsing::Stmt;
 use std::fmt::{Display, Error, Formatter};
-use std::panic;
-use crate::interpreting::l_object::LObject::{LTuple, LFunction};
 use crate::parsing::stmt::Stmt::{FnCurried, FnStmt};
 use std::rc::Rc;
 use std::cell::RefCell;
+use crate::interpreting::objects::l_object::LObject::LFunction;
+use crate::interpreting::objects::{LObject, LInvocable};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Function {
@@ -21,6 +21,7 @@ impl Function {
 }
 
 impl LInvocable for Function {
+    // Is this seperation of functions necessary anymore?
     fn invoke(&self, arg: Rc<RefCell<LObject>>, interpreter: &mut Interpreter) -> Result<Rc<RefCell<LObject>>, InterpreterError> {
         let env = Rc::new(RefCell::new(Env::new(Some(Rc::clone(&self.closure)))));
         match &self.declaration {
@@ -31,13 +32,17 @@ impl LInvocable for Function {
 
             FnStmt { params, ret_type, body, name,.. } => {
                 let paramnames = params.iter().map(|x| x.clone().name).collect::<Vec<String>>();
-                if let LTuple(ref xs) = *arg.borrow() {
-                    for (i, p) in paramnames.iter().enumerate() {
-                        env.borrow_mut().define(p.to_string(), Some(xs[i].clone()))
-                    }
-                } else if paramnames.len() == 1 {
-                    env.borrow_mut().define(paramnames[0].clone(), Some(arg.clone()))
+                if !params.is_empty() {
+                    env.borrow_mut().define(paramnames[0].clone(), Some(arg.clone()));
                 }
+//                if let LTuple(ref xs) = *arg.borrow() {
+//                    for (i, p) in paramnames.iter().enumerate() {
+//                        env.borrow_mut().define(p.to_string(), Some(xs[i].clone()))
+//                    }
+//                } else if paramnames.len() == 1 {
+//                    env.borrow_mut().define(paramnames[0].clone(), Some(arg.clone()));
+//                    println!("env: {:?}", env);
+//                }
 
                 interpreter.execute_block(body, env)
             },
@@ -51,10 +56,10 @@ impl Display for Function {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         match &self.declaration {
             FnStmt { name, .. } => match name {
-                Some(name) => write!(f, "[Function {}]", name),
-                None => write!(f, "[Function]"),
+                Some(name) => write!(f, "[Function {} [{}]]", name, self.declaration),
+                None => write!(f, "Function [{}]", self.declaration),
             }
-            _ => write!(f, "[CFunction]")
+            _ => write!(f, "CFunction [{}]]", self.declaration),
         }
     }
 }

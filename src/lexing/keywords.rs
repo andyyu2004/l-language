@@ -26,7 +26,10 @@ impl Keywords {
             "else" => TokenType::Else,
             "record" => TokenType::Record,
             "type" => TokenType::Type,
-            "while" => TokenType::While
+            "while" => TokenType::While,
+            "struct" => TokenType::Struct,
+            "data" => TokenType::Data,
+            "match" => TokenType::Match
         ]
     }
 }

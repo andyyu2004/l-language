@@ -17,6 +17,15 @@ impl Token {
             col,
         }
     }
+
+    pub fn dummy() -> Token {
+        Token {
+            lexeme: "generated token".to_string(),
+            ttype: TokenType::Nothing,
+            line: -1,
+            col: -1
+        }
+    }
 }
 
 impl Display for Token {
@@ -38,19 +47,17 @@ pub enum TokenType {
     Pipe, DoublePipe,
     Ampersand, DoubleAmpersand,
     PlusEqual, MinusEqual, StarEqual, SlashEqual, Modulo,
-    Var,
-    Let,
-    Print,
-    Identifier,
-    Comma,
-    Colon,
-    Fn,
+    Var, Let, Print, Identifier, Fn,
+    Comma, Underscore,
+    Colon, DoubleColon,
     Typename,
     Return,
     Dot, DoubleDot,
-    If, Else, While,
+    If, Else, While, Match,
     Record, Type,
-    RightArrow, RightFatArrow
+    RightArrow, RightFatArrow,
+    Struct, Data,
+    Nothing
 }
 
 

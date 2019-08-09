@@ -1,21 +1,27 @@
 use LObject::{LNumber, LString, LBool, LUnit};
 use std::fmt::{Display, Formatter, Error};
-use crate::interpreting::Function;
-use crate::interpreting::l_object::LObject::{LFunction, LTuple, LRecord};
 use crate::parsing::expr::{format_tuple, format_record};
 use std::collections::HashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
 use itertools::Itertools;
+use crate::interpreting::objects::l_object::LObject::{LRecord, LVariant, LTuple, LFunction, LStruct};
+use crate::interpreting::objects::{Function, Variant, Struct, Tuple};
+use crate::interpreting::pattern_matching::Matchable;
+use crate::interpreting::{LPattern, Interpreter};
+use crate::interpreting::LPattern::*;
+use std::ops::Deref;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum LObject {
     LString(String),
     LNumber(f64),
     LBool(bool),
-    LTuple(Vec<Rc<RefCell<LObject>>>),
-    LFunction(Function),
+    LTuple(Tuple),
     LRecord(HashMap<String, Rc<RefCell<LObject>>>),
+    LFunction(Function),
+    LStruct(Struct),
+    LVariant(Variant),
     LUnit
 }
 
@@ -38,7 +44,7 @@ impl LObject {
 
     pub fn boolean(&self) -> bool {
         if let LBool(b) = self { *b }
-        else { panic!("Expected LObject to be a number") }
+        else { panic!("Expected LObject to be a boolean") }
     }
 
     pub fn boolean_mut(&mut self) -> &mut bool {
@@ -48,9 +54,43 @@ impl LObject {
 
     pub fn function_mut(&mut self) -> &mut Function {
         if let LFunction(f) = self { f }
-        else { panic!("Expected LObject to be a number") }
+        else { panic!("Expected LObject to be a function") }
     }
 
+    pub fn tuple(&self) -> &Tuple {
+        if let LTuple(tuple) = self { tuple }
+        else { panic!("Expected LObject to be a tuple") }
+    }
+
+    pub fn variant(&self) -> &Variant {
+        if let LVariant(variant) = self { variant }
+        else { panic!("Expected LObject to be a variant") }
+    }
+
+}
+
+impl Matchable<Self> for LObject {
+    fn is_match(&self, pattern: &LPattern) -> bool {
+        match pattern {
+            PIdentifier(x) => true,
+            PWildcard => true,
+            PTuple(_) => self.tuple().is_match(pattern),
+            PRecord => false,
+            PLiteral(x) => Interpreter::literal_to_l_object(x).borrow().deref() == self,
+            PVariant(..) => self.variant().is_match(pattern),
+        }
+    }
+
+    fn bindings(&self, pattern: &LPattern) -> Vec<(String, LObject)> {
+        match pattern {
+            PIdentifier(x) => vec![(x.lexeme.clone(), self.clone())],
+            PWildcard => vec![],
+            PTuple(_) => self.tuple().bindings(pattern),
+            PRecord => vec![],
+            PLiteral(_) => vec![],
+            PVariant(..) => self.variant().bindings(pattern)
+        }
+    }
 }
 
 impl Display for LObject {
@@ -61,13 +101,14 @@ impl Display for LObject {
             LBool(b) => write!(f, "{}", b),
             LUnit => write!(f, "()"),
             LFunction(function) => write!(f, "{}", function),
-            LTuple(xs) => write!(f, "({})", format_tuple(&xs.iter().map(|x| x.borrow().clone()).collect_vec())),
+            LTuple(xs) => write!(f, "{}", xs),
+            LVariant(variant) => write!(f, "{}", variant),
             LRecord(xs) => {
                 let mut ys = HashMap::new();
                 for (k, v) in xs {
                     ys.insert(k.clone(), v.borrow().clone());
                 }
-                write!(f, "{{{}}}", format_record(&ys))
+                write!(f, "{{{}}}", format_record(&ys, ", "))
             },
             x => write!(f, "{:?}", x)
         }

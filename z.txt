@@ -1,7 +1,7 @@
 
 fn curried = a: Int => b: Int : Int { a + b }
 
-fn higherOrder(f: Int -> Int -> Int) -> Unit { f 3 6; }
+fn higherOrder = f: Int -> Int -> Int : Unit { f 3 6; }
 
 curried 4 6 !
 
@@ -9,7 +9,7 @@ let partial: Int -> Int = curried 100;
 
 partial 2 !
 
-fn htest(f: Int -> Int) { f 5; }
+fn htest = f: Int -> Int { f 5; }
 
 htest partial;
 
@@ -29,7 +29,7 @@ fac 1 !
 fac 2 !
 fac 20 !
 
-fn fib(n: Int) -> Int { if n < 2 { 1 } else { fib (n - 1) + fib (n - 2) }}
+fn fib = n: Int : Int { if n < 2 { 1 } else { fib (n - 1) + fib (n - 2) }}
 fib 3 !
 fib 4 !
 fib 8 !

@@ -5,12 +5,13 @@ use crate::parsing::{Expr, Stmt, Mode};
 use crate::errors::LError;
 use crate::types::LType;
 use crate::types::l_types::Pair;
-use crate::parsing::stmt::Stmt::{FnStmt, LetStmt, FnCurried, VarStmt, ReturnStmt, TypeAlias, WhileStmt};
-use crate::types::l_types::LType::{TTuple, TRecord, TName};
-use crate::parsing::expr::Expr::{EApplication, EBinary, EUnary, ELiteral, EVariable, EAssignment, EIf, EBlock, ERecord, ELogic, EGet, ESet};
+use crate::parsing::stmt::Stmt::{FnStmt, LetStmt, FnCurried, VarStmt, ReturnStmt, TypeAlias, WhileStmt, StructDecl, DataDecl};
+use crate::types::l_types::LType::{TTuple, TRecord, TName, TArrow, TUnit};
+use crate::parsing::expr::Expr::{EApplication, EBinary, EUnary, ELiteral, EVariable, EAssignment, EIf, EBlock, ERecord, ELogic, EGet, ESet, EDataConstructor, EMatch, EIfLet};
 use std::fmt::{Display};
 use std::collections::HashMap;
 use crate::lexing::token::TokenType::{Plus, Minus};
+use crate::interpreting::pattern_matching::LPattern;
 
 /*
 <expr> ::= <addition>
@@ -158,6 +159,10 @@ impl Parser {
             self.parse_type_alias()
         } else if self.match1(TokenType::While) {
             self.parse_while()
+        } else if self.match1(TokenType::Struct) {
+            self.parse_struct()
+        } else if self.match1(TokenType::Data) {
+            self.parse_data()
         } else {
             self.parse_statement()
         }
@@ -209,8 +214,11 @@ impl Parser {
 
     fn parse_fn_decl(&mut self) -> Result<Stmt, LError> {
         let token = self.expect(TokenType::Identifier)?.clone();
+        // Some holes in the previous design of functional definitions
+        // Only allow parameterless functions declared in shorthand now
         if self.match1(TokenType::LParen) {
             let params = self.parse_typed_params()?;
+            if !params.is_empty() { return Err(LError::from_token("Function shorthand only allowed for parameterless definitions".to_string(), &token)) }
             let mut ret_type = LType::TUnit;
             if self.match1(TokenType::RightArrow) { ret_type = self.parse_type()?; }
             self.expect(TokenType::LBrace)?;
@@ -225,7 +233,7 @@ impl Parser {
 
     // Only name function on first iteration
     fn parse_curried_fn_decl(&mut self, name: Option<String>) -> Result<Stmt, LError> {
-        // fn f = x: Int => y: Bool => z: Bool : ret => { body } // Optional colon indicating type
+        // fn f = x: Int => y: Bool => z: Bool : ret { body } // Optional colon indicating type
         let token = self.current().clone();
         let param = self.parse_name_type_pair()?;
         if self.match1(TokenType::RightFatArrow) {
@@ -236,6 +244,9 @@ impl Parser {
             self.expect(TokenType::LBrace)?;
             let body = self.parse_block()?;
             Ok(FnStmt { name, token, params: vec![param], ret_type, body })
+        } else if self.match1(TokenType::LBrace) {
+            let body = self.parse_block()?;
+            Ok(FnStmt { name, token, params: vec![param],  ret_type: TUnit, body })
         } else {
             Err(LError::from_token("Invalid curried function syntax".to_string(), &token))
         }
@@ -315,6 +326,37 @@ impl Parser {
         Ok(ReturnStmt { token, value })
     }
 
+    fn parse_struct(&mut self) -> Result<Stmt, LError> {
+        let name = self.expect(TokenType::Typename)?.clone();
+        self.expect(TokenType::LBrace)?;
+        let fields = self.parse_record(&Parser::parse_type)?;
+        Ok(StructDecl { name, fields })
+    }
+
+    fn parse_data(&mut self) -> Result<Stmt, LError> {
+        let name = self.expect(TokenType::Typename)?.clone();
+        self.expect(TokenType::Equal)?;
+        let mut variants = HashMap::new();
+        while {
+            let vname = self.expect(TokenType::Typename)?.lexeme.clone();
+//            let vtype = self.parse_type()?;
+//            variants.insert(vname, TArrow(Box::new(vtype), Box::new(TName(name.clone()))));
+            let vtype = self.parse_variant_type(LType::TName(name.clone()))?;
+            variants.insert(vname, vtype);
+            self.match1(TokenType::Pipe)
+        } {}
+        self.expect(TokenType::Semicolon)?;
+        Ok(DataDecl { name, variants })
+    }
+
+    fn parse_variant_type(&mut self, mut t: LType) -> Result<LType, LError> {
+        // Build from the right in reverse, seems to work, correct order and associativity
+        while self.current().ttype != TokenType::Pipe && self.current().ttype != TokenType::Semicolon && self.current().ttype != TokenType::EOF {
+            t = TArrow(Box::new(self.parse_primitive_type()?), Box::new(t))
+        }
+        Ok(t)
+    }
+
 }
 
 
@@ -327,7 +369,7 @@ impl Parser {
 
     // <assn> ::= <lvalue> = <assn> | <eq>
     fn parse_assignment(&mut self) -> Result<Expr, LError> {
-        let expr = self.parse_block_expr()?;
+        let expr = self.parse_match()?;
         if self.match1(TokenType::Equal) {
             let token = self.previous().clone();
             let right = self.parse_assignment()?;
@@ -357,40 +399,104 @@ impl Parser {
         Ok(expr)
     }
 
-    fn parse_block_expr(&mut self) -> Result<Expr, LError> {
-        if self.match1(TokenType::LBrace) {
-            Ok(EBlock(self.parse_block()?))
+    fn parse_match(&mut self) -> Result<Expr, LError> {
+        if self.match1(TokenType::Match) {
+            let token = self.previous().clone();
+            let expr = self.parse_expression()?;
+            self.expect(TokenType::LBrace)?;
+            let mut branches = vec![];
+            while self.match1(TokenType::Pipe) {
+                let pattern = self.parse_pattern()?;
+                self.expect(TokenType::RightArrow)?;
+                let body = self.parse_block_expr()?;
+                branches.push((pattern, body));
+            }
+            self.expect(TokenType::RBrace)?;
+            Ok(EMatch { token, expr: Box::new(expr), branches })
         } else {
             self.parse_conditional()
         }
     }
 
+    fn parse_pattern(&mut self) -> Result<LPattern, LError> {
+        if self.match1(TokenType::Underscore) {
+            Ok(LPattern::PWildcard)
+        } else if self.match1(TokenType::Identifier) {
+            Ok(LPattern::PIdentifier(self.previous().clone()))
+        } else if self.match1(TokenType::Typename) {
+            Ok(LPattern::PVariant(self.previous().clone(), Box::new(self.parse_pattern().ok())))
+        } else if self.match1(TokenType::LParen) {
+            let mut v = vec![];
+            while {
+                v.push(self.parse_pattern()?);
+                self.match1(TokenType::Comma)
+            } {}
+            self.expect(TokenType::RParen)?;
+            Ok(LPattern::PTuple(v))
+        } else {
+            Err(LError::from_token("Bad pattern".to_string(), self.current()))
+        }
+    }
+
     fn parse_conditional(&mut self) -> Result<Expr, LError> {
         if self.match1(TokenType::If) {
-            let token = self.previous().clone();
-            let condition = self.parse_expression()?;
-            self.expect(TokenType::LBrace)?;
-            let left = EBlock(self.parse_block()?);
-            // Might be easier to represent no else as empty block instead of an Option type
-            let right = if self.match1(TokenType::Else) {
-                if self.match1(TokenType::LBrace) {
-                    self.parse_block().map(EBlock)
-                } else if self.match1(TokenType::If) {
-                    self.i -= 1;
-                    self.parse_conditional()
-                } else {
-                    return Err(LError::from_token("Expected block or if after else".to_string(), self.current()));
-                }
+            if self.match1(TokenType::Let) {
+                self.parse_if_let()
             } else {
-                Ok(EBlock(vec![]))
-            };
+                let token = self.previous().clone();
+                let condition = self.parse_expression()?;
+                self.expect(TokenType::LBrace)?;
+                let left = EBlock(self.parse_block()?);
+                // Might be easier to represent no else as empty block instead of an Option type
+                let right = self.parse_optional_else()?;
+                Ok(EIf {
+                    token,
+                    condition: Box::new(condition),
+                    left: Box::new(left),
+                    right: Box::new(right)
+                })
+            }
+        } else {
+            self.parse_block_expr()
+        }
+    }
 
-            Ok(EIf {
-                token,
-                condition: Box::new(condition),
-                left: Box::new(left),
-                right: Box::new(right?)
-            })
+    fn parse_if_let(&mut self) -> Result<Expr, LError> {
+        let token = self.previous().clone();
+        let pattern = self.parse_pattern()?;
+        // Only one pattern allowed for now
+        self.expect(TokenType::Equal)?;
+        let scrutinee = self.parse_expression()?;
+        self.expect(TokenType::LBrace)?;
+        let left = self.parse_block()?;
+        let right = self.parse_optional_else()?;
+        Ok(EIfLet {
+            token,
+            pattern,
+            scrutinee: Box::new(scrutinee),
+            left,
+            right: Box::new(right)
+        })
+    }
+
+    fn parse_optional_else(&mut self) -> Result<Expr, LError> {
+        if self.match1(TokenType::Else) {
+            if self.match1(TokenType::LBrace) {
+                self.parse_block().map(EBlock)
+            } else if self.match1(TokenType::If) {
+                self.i -= 1;
+                self.parse_conditional()
+            } else {
+                return Err(LError::from_token("Expected block or if after else".to_string(), self.current()));
+            }
+        } else {
+            Ok(EBlock(vec![]))
+        }
+    }
+
+    fn parse_block_expr(&mut self) -> Result<Expr, LError> {
+        if self.match1(TokenType::LBrace) {
+            Ok(EBlock(self.parse_block()?))
         } else {
             self.logical_or()
         }
@@ -548,16 +654,18 @@ impl Parser {
 //            Ok(Expr::Grouping(Box::new(expr?))) // dont think this is explicitly required
         } else if self.match1(TokenType::Identifier) {
             Ok(EVariable { name: self.previous().clone() })
+        } else if self.match1(TokenType::Typename) {
+            Ok(EDataConstructor { name: self.previous().clone() })
         } else if self.r#match(&[TokenType::False, TokenType::True, TokenType::Number]) {
             Ok(ELiteral(self.previous().clone()))
         } else if self.match1(TokenType::Record) {
             self.expect(TokenType::LBrace)?;
             let token = self.previous().clone();
             Ok(ERecord(token, self.parse_record(&Parser::parse_expression)?))
-//            self.parse_record(&Parser::parse_expression).map(ERecord)
+//            self.parse_record(&Parser::parse_expression).map(ERecord)?
         } else {
             let t = self.current();
-            Err(LError::from_token(format!("unexpected token: {}", t), t))
+            Err(LError::from_token(format!("Unexpected token (primary): {}", t), t))
         }
     }
 
@@ -593,15 +701,15 @@ impl Parser {
     fn parse_record<F, T>(&mut self, f: &F) -> Result<HashMap<String, T>, LError>
         where F: Fn(&mut Self) -> Result<T, LError>, T : Display {
         let mut v = HashMap::new();
-        while {
+        while self.current().ttype != TokenType::RBrace && self.current().ttype != TokenType::EOF {
             let current_line = self.current().line;
             let current_col = self.current().col;
             let pair = self.parse_record_entry(f)?;
             if v.insert(pair.name, pair.value).is_some() {
                 return Err(LError::new("All fields in record must be unique".to_string(), current_line, current_col))
             };
-            self.match1(TokenType::Comma)
-        } {}
+            self.match1(TokenType::Comma); // Allows optional final comma
+        }
         self.expect(TokenType::RBrace)?;
         Ok(v)
     }

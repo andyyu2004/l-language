@@ -1,100 +1,100 @@
-fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
-fac 3
-fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
-fac 3
-fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
-fac 3
-fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
-fac 0
-fac 0!
-fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
-fac 1
-fac 2
-fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
-fac 2
-fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
-fac 2
-fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
-fac 2
-fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
-fac 2
-fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
-fac 2
-fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
-fac 2
-fn rec(n: Int) { if n == 0 { 0 } else {rec(n-1)}
-fn rec(n: Int) { if n == 0 { 0 } else {rec(n-1)}}
-fn rec(n: Int): Int { if n == 0 { 0 } else {rec(n-1)}}
-fn rec(n: Int) -> Int { if n == 0 { 0 } else {rec(n-1)}}
-fac 2
-rec 0
-rec 1
-fn rec() { rec() }
-rec)_
-rec();
-fn rec() { rec() }
-rec();
-fn rec() { rec() }
-rec();
-fn rec(n: Int) -> Int { if n == 0 { 0 } else {rec(n-1)}}
-fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
-fac 5
-fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
-fac 1
-fac 1 !
-fn five() -> Int { 5 }
-five()
-5
-five()
-fn five() -> Int { 5 }
-five()
-fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
-fac 5
-fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
-fac 5
-fac 6
-fac 100
-fac 500
-fac 400
-fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
-fac 400
-fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
-fac 200
-fac 300
-code .
-fac 200
-fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
-fac 200
-fn fib(n:Int) -> Int { if n < 2 { n} else { fib (n-1) + fib(n-2) }}
-fib 20
-fib 400
-fib 300
-fn fib(n:Int) -> Int { if n < 2 { n} else { fib (n-1) + fib(n-2) }}
-fib 300
-fn fib(n:Int) -> Int { if n < 2 { n} else { fib (n-1) + fib(n-2) }}
-fib 300
-let x = 0
-var x = 0;
-while x < 100 { x!; x = x + 1 }
-while x < 100 { x! x = x + 1 }
-let x = 5;
-{ x = x + 1 }
-var x = 5;
-{ x = x + 1 }
-var x = 5;
-4>=4
-4>=3
-4>=5
--=
-let x = 1;
-x += 1
-let x = 1;
-x += 1
-var x = 1;
-x += 1
-var x = 1;
-x += 1
-var x = 1;
-x += 1
-x += 1 + 4
-x -= 100
+Node (TNil, Node(TNil, TNil))
+fn t = () : Int { 4 }
+fn t = (): Unit : Int { 4 }
+fn t = x: Unit : Int { 4 }
+t()
+if false { 5} else { 57}
+if false { 5 } else { 57 }
+fn f() -> Int { 5 }
+fn()
+f()
+fn f() -> Int { 5 }
+f
+fn f() -> Int { 5 }
+f()
+fn f() -> Int { 5 }
+f()
+fn f() -> Int { 5 }
+f()
+match 5 {}
+match 5 { Nil -> {}}
+match 5 { | Nil -> {}}
+match 5 { | Nil -> {} | Fuck -> 5}
+if let S = 6 {}
+data B = F | T
+if let F = x
+if let F = x {}
+if let T = x {}
+if let F = x {}
+if let R = x {}
+if let T = x {}
+data B = F | T
+if let T = x {}
+if let F = x {}
+data List = Nil | Cons Int List
+if let Nil = x {}
+data List = Nil | Cons Int List
+if let Nil = x {}
+data List = Nil | Cons Int List
+if let Nil = x {}
+let x = No;
+let x = Nil;
+if let Nil = x {}
+if let Nil x = x {}
+if let Nil = x {}
+data List = Nil | Cons Int List
+data List = Nil | Cons Int List;
+Nil 3
+Nil
+Cons 1
+data List = Nil | Cons Int List;
+data List = Nil | Cons (Int, List);
+Cons 1
+Cons (1, Nil)
+(1,2,3)
+if let x = (1,2,3) {}
+if let x = (1,2,3) { 5}
+if let x = (1,2,3) { 5 }
+if let x = (1,2,3) { }
+if let x = (1,2,3) { false }
+if let x = (1,2,3) { false } else { true {
+if let x = (1,2,3) { false } else { true }
+if let (x,y,z) = (1,2,3) { false } else { true }
+if let _ = (1,2,3) { false } else { true }
+if let x = (1,2,3) { false } else { true }
+if let x = (1,2,3) { x } else { true }
+if let x = (1,2,3) { false } else { true }
+if let x = (1,2,3) { x } else { true }
+if let (a,b,c)  = (1,2,3) { x } else { true }
+if let (a,b,c)  = (1,_,3) { x } else { true }
+if let (a,_,c)  = (1,3,3) { x } else { true }
+if let (a,_,(c,v,f))  = (1,3,3) { x } else { true }
+if let (a,_,(c,v,f), x)  = (1,3,3) { x } else { true }
+if let (a,b,c)  = (1,3,3) { x } else { true }
+if let (a,b,x)  = (1,3,3) { x } else { true }
+if let (a,b,x) = (1,3,3) { x } else { true }
+if let (a,b,x) = (1,3,3) { x } else { 9999 }
+if let (a,b,c) = (1,2,3) { x } else { 9999 }
+if let (a,b,c) = (1,2,3) { c } else { 9999 }
+if let (a,b,c) = (1,2,3) { b } else { 9999 }
+if let (a,b,c) = (1,2,3) { a } else { 9999 }
+if let (a,b,c) = (1,2,3) { b } else { 9999 }
+if let (a,b,c) = (1,2,3) { a } else { 9999 }
+if let (a,b,c) = (1,2,3) { (a,b,c,0) } else { 9999 }
+if let (a,b,c) = (1,2,3) { a! b! c! } else { 9999 }
+if let (a,b,c) = (1,2,3) { a! b! c! 0 } else { 9999 }
+data B = T | F;
+let x = T;
+if let T = x { 1! }
+if let T = x { 1! } else { 0! }
+if let 1 = x { 1! } else { 0! }
+if let y = x { 1! } else { 0! }
+let x = T;
+data List = Nil | Cons (Number, List);
+Cons (0, Nil)
+data List = Nil | Cons (Number, List);
+Cons (0, Nil)
+data List = Nil | Cons (Number, List);
+Cons (0, Nil)
+data List = Nil | Cons (Number, List);
+Cons (0, Nil)
