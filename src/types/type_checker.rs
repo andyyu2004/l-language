@@ -1,16 +1,16 @@
 use crate::parsing::{Expr, Stmt, Mode};
 use crate::lexing::{TokenType, Token};
 use crate::types::{LType, LTypeError};
-use crate::types::l_types::LType::{TBool, TNum, TArrow, TTuple, TUnit, TRecord, TData, TVariant, TTop, TNothing};
+use crate::types::l_types::LType::{TBool, TNum, TArrow, TTuple, TUnit, TRecord, TData, TVariant, TTop, TNothing, TList};
 use crate::types::l_types::Pair;
-use crate::parsing::expr::Expr::{EBinary, ELiteral, EVariable, ETuple, EApplication, EAssignment, EBlock, EIf, ERecord, ELogic, EGet, ESet, EDataConstructor, EMatch, EIfLet};
+use crate::parsing::expr::Expr::{EBinary, ELiteral, EVariable, ETuple, EApplication, EAssignment, EBlock, EIf, ERecord, ELogic, EGet, ESet, EDataConstructor, EMatch, EIfLet, EList};
 use crate::interpreting::Env;
 use crate::types::LTypeError::{TypeError, NonFunction, InvalidDeclaration, TypeMismatch, NonExistentField, NotGettable, NonExistentType, NonExistentDataConstructor, BadPattern};
 use crate::parsing::stmt::Stmt::{LStmt, FnStmt, VarStmt, LetStmt, FnCurried, ExprStmt, ReturnStmt, PrintStmt, TypeAlias, WhileStmt, StructDecl, DataDecl};
 use crate::lexing::token::TokenType::{Greater, GreaterEqual, Caret, Slash, Plus, Star, LessEqual, Less, Minus, BangEqual, DoubleEqual};
 use crate::interpreting::LPattern::*;
 use std::mem::{discriminant};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::rc::Rc;
 use std::cell::RefCell;
 use crate::interpreting::pattern_matching::LPattern;
@@ -69,6 +69,7 @@ impl TypeChecker {
             EIf { condition, left, right, token } => self.type_of_if(token, condition, left, right),
             EBlock(xs) => self.type_of_block_e(xs),
             ETuple(_, xs) => self.type_of_tuple(xs),
+            EList(token, xs) => self.type_of_list(token, xs),
             ERecord(_, xs) => self.type_of_record(xs),
             ELogic { operator, left, right} => self.type_of_logical(operator, left, right),
             EGet { name, expr } => self.type_of_get(name, expr),
@@ -157,6 +158,18 @@ impl TypeChecker {
         }
     }
 
+    fn type_of_list(&mut self, token: &Token, xs: &VecDeque<Expr>) -> Result<LType, LTypeError> {
+        let tfirst = self.type_of_expr(&xs[0])?;
+        for x in xs {
+            let t = self.type_of_expr(x)?;
+            if t != tfirst {
+                return Err(TypeMismatch(tfirst, t, token.clone()))
+            }
+        }
+        Ok(TList(Box::new(tfirst)))
+
+    }
+
     fn type_of_record(&mut self, xs: &HashMap<String, Expr>) -> Result<LType, LTypeError> {
         let mut map = HashMap::new();
         for (k, v) in xs {
@@ -185,7 +198,7 @@ impl TypeChecker {
 //        if ptype != texpr { return Err(TypeError(texpr, ptype, token.clone())) }
         let mut env = Env::new(Some(Rc::clone(&self.env)));
         let bindings = self.type_of_pattern_bindings(token, pattern, &texpr)?;
-        println!("TBindings: {:?}", bindings);
+//        println!("TBindings: {:?}", bindings);
         for (k, v) in bindings { env.define(k, v); }
         let tleft = self.type_of_block(left, Rc::new(RefCell::new(env)))?;
         let tright = self.type_of_expr(right)?;

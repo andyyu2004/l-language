@@ -5,17 +5,17 @@ use crate::errors::LError;
 use crate::types::l_types::Pair;
 use crate::types::LType;
 use crate::parsing::stmt::Stmt::{ExprStmt, LStmt, VarStmt, LetStmt, FnStmt, FnCurried, ReturnStmt, PrintStmt, TypeAlias, WhileStmt, StructDecl, DataDecl};
-use crate::parsing::expr::Expr::{EUnary, EApplication, EVariable, ELiteral, EBinary, ETuple, EAssignment, EBlock, EIf, ERecord, ELogic, EGet, ESet, EDataConstructor, EVariant, EIfLet};
+use crate::parsing::expr::Expr::{EUnary, EApplication, EVariable, ELiteral, EBinary, ETuple, EAssignment, EBlock, EIf, ERecord, ELogic, EGet, ESet, EDataConstructor, EVariant, EIfLet, EList};
 use std::panic;
 use crate::interpreting::interpreter_error::InterpreterError::{Return};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::rc::Rc;
 use std::cell::{RefCell};
 use crate::lexing::token::TokenType::{BangEqual, DoubleEqual, LessEqual, GreaterEqual, Caret, Slash, Plus, Star, Less, Minus, Greater};
 use crate::types::l_types::LType::{TArrow, TName, TRecord, TTuple, TBool, TUnit};
 use crate::generation::generate_function_from_type;
 use crate::interpreting::pattern_matching::Matchable;
-use crate::interpreting::objects::l_object::LObject::{LFunction, LNumber, LBool, LVariant, LRecord, LTuple, LUnit, LStruct};
+use crate::interpreting::objects::l_object::LObject::{LFunction, LNumber, LBool, LVariant, LRecord, LTuple, LUnit, LStruct, LList};
 use crate::interpreting::objects::{LObject, LInvocable, Variant, Function, Struct, Tuple};
 
 pub struct Interpreter {
@@ -64,7 +64,7 @@ impl Interpreter {
             TypeAlias {..} => Ok(()),
             DataDecl { name, variants } => self.execute_data_decl(name, variants),
             StructDecl { name, fields } => self.execute_struct(name, fields),
-            x => Err(InterpreterError::from(LError::new(format!("Unknown stmt type {}", x), -1, -1)))
+            // x => Err(InterpreterError::from(LError::new(format!("Unknown stmt type {}", x), -1, -1)))
         }
     }
 
@@ -244,9 +244,9 @@ impl Interpreter {
             },
             ELiteral(token) => Ok(Interpreter::literal_to_l_object(token)),
             EVariable { name, ..} | EDataConstructor { name } => self.evaluate_variable(name),
-            ETuple(_, xs) => Ok(Rc::new(RefCell::new((LTuple(Tuple::new(
+            ETuple(_, xs) => Ok(Rc::new(RefCell::new(LTuple(Tuple::new(
                 xs.iter().map(|x| self.evaluate(x)).collect::<Result<Vec<Rc<RefCell<LObject>>>, _>>()?
-            )))))),
+            ))))),
             EApplication { token, callee, arg } => self.evaluate_curried_application(token, callee, arg),
             EAssignment { lvalue, expr} => self.evaluate_assignment(lvalue, expr),
             EBlock(xs) => self.execute_block(&xs, self.wrap(Env::new(Some(Rc::clone(&self.env))))),
@@ -260,6 +260,9 @@ impl Interpreter {
             },
             EIfLet { token, pattern, scrutinee, left, right } =>
                 self.evaluate_if_let(token, pattern, scrutinee, left, right),
+            EList(_, xs) => Ok(Rc::new(RefCell::new(LList(
+                xs.iter().map(|x| self.evaluate(x)).collect::<Result<VecDeque<Rc<RefCell<LObject>>>, _>>()?
+            )))),
             _ => Err(InterpreterError::from(LError::new("Unknown expr type".to_string(), 0, 0)))
         }
     }

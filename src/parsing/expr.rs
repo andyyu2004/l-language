@@ -2,10 +2,10 @@ use std::fmt::{Display, Error, Formatter};
 
 use crate::lexing::Token;
 use itertools::{join};
-use crate::parsing::expr::Expr::{EBinary, EUnary, EVariable, ELiteral, ETuple, EApplication, EAssignment, EBlock, EIf, ERecord, ELogic, EGet, ESet, EDataConstructor, EVariant, EMatch, EIfLet};
+use crate::parsing::expr::Expr::*;
 use crate::parsing::Stmt;
 use crate::parsing::stmt::format_block;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use crate::types::LType;
 use crate::interpreting::pattern_matching::LPattern;
 
@@ -30,6 +30,7 @@ pub enum Expr {
     // Using Vector for left as it may require variable insertion into env and block evaluation builds empty env automatically
     EIfLet { token: Token, pattern: LPattern, scrutinee: Box<Expr>, left: Vec<Stmt>, right: Box<Expr> },
     EVariant(String, Box<Expr>),
+    EList(Token, VecDeque<Expr>), // Efficient insertion from both ends
 }
 
 impl Display for Expr {
@@ -50,6 +51,7 @@ impl Display for Expr {
             ELogic { operator, left, right } => write!(f, "{}{{{}}}{{{}}}", operator, left, right),
             EVariant(name, expr) => write!(f, "variant {}: {}", name, expr),
             EMatch { expr, branches,.. } => write!(f, "match {} {{{}}}", expr, format_paired_vec(branches, " | ")),
+            EList(_, xs) => write!(f, "[{}]", join(xs, ", ")),
             EIf { token, condition, left, right } => match **right {
                 EBlock(ref xs) if !xs.is_empty() => write!(f, "if {} then {} else {}", condition, left, right),
                 _ => write!(f, "if {} then {}", condition, left),
@@ -64,7 +66,7 @@ impl Display for Expr {
 }
 
 pub fn format_tuple<T>(args: &Vec<T>) -> String where T : Display {
-    join(args, ", ")
+    join(args, ",")
 }
 
 pub fn format_paired_vec<T, U>(xs: &Vec<(T, U)>, sep: &str) -> String where T : Display, U : Display {

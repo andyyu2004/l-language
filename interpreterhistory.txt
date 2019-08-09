@@ -1,14 +1,3 @@
-Node (TNil, Node(TNil, TNil))
-fn t = () : Int { 4 }
-fn t = (): Unit : Int { 4 }
-fn t = x: Unit : Int { 4 }
-t()
-if false { 5} else { 57}
-if false { 5 } else { 57 }
-fn f() -> Int { 5 }
-fn()
-f()
-fn f() -> Int { 5 }
 f
 fn f() -> Int { 5 }
 f()
@@ -98,3 +87,14 @@ data List = Nil | Cons (Number, List);
 Cons (0, Nil)
 data List = Nil | Cons (Number, List);
 Cons (0, Nil)
+data List = Nil | Cons Int List;
+data List = Nil | Cons Int Bool List;
+[1,2,3]
+let tuple: (Bool, Int) = (2,2)
+let tuple: (Bool, Int) = (2,2);
+[1,2,3]
+[1,2,3,5,6,7]
+3:[1,2,3,5,6,7]
+data List = Nil | Cons Int Bool List;
+Cons 5
+Cons 5 false

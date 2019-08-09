@@ -2,7 +2,7 @@ use crate::parsing::{Stmt, Expr};
 use crate::errors::LError;
 use crate::parsing::stmt::Stmt::{LStmt, ExprStmt, VarStmt, LetStmt, FnStmt, FnCurried, ReturnStmt, PrintStmt, TypeAlias, WhileStmt, StructDecl, DataDecl};
 use crate::interpreting::{Env, LPattern};
-use crate::parsing::expr::Expr::{EVariable, EApplication, EAssignment, EBlock, EIf, ERecord, ELogic, EBinary, EGet, ETuple, ESet, EDataConstructor, EMatch, EIfLet};
+use crate::parsing::expr::Expr::{EVariable, EApplication, EAssignment, EBlock, EIf, ERecord, ELogic, EBinary, EGet, ETuple, ESet, EDataConstructor, EMatch, EIfLet, EList};
 use crate::static_analysis::StaticInfo;
 use crate::static_analysis::static_info::StaticInfo::{IVariable, ILetBinding, IFunction, IEmpty};
 use crate::lexing::Token;
@@ -84,6 +84,7 @@ impl StaticAnalyser {
                 self.analyse_if_let(token, pattern, scrutinee, left, right),
             EGet { name, expr } => self.analyse_get_expr(name, expr),
             ESet { name, expr, value} => self.analyse_set_expr(name, expr, value),
+            EList(_, xs) => { for x in xs { self.analyse_expr(x)?; } ; Ok(IEmpty) },
             EMatch { token, expr, branches} => self.analyse_match(token, expr, branches),
             ELogic { operator, left, right} | EBinary { operator, left, right } =>
                 self.analyse_binary(operator, left, right),

@@ -29,6 +29,15 @@ impl Lexer {
                 ' ' => {},
                 ',' => tokens.push(self.create_token(TokenType::Comma, char::to_string(&c))),
                 '_' => tokens.push(self.create_token(TokenType::Underscore, char::to_string(&c))), // This disallows underscore starting ids also
+                '*' => tokens.push(self.create_token(TokenType::Star, char::to_string(&c))),
+                '^' => tokens.push(self.create_token(TokenType::Caret, char::to_string(&c))),
+                '{' => tokens.push(self.create_token(TokenType::LBrace, char::to_string(&c))),
+                '}' => tokens.push(self.create_token(TokenType::RBrace, char::to_string(&c))),
+                '(' => tokens.push(self.create_token(TokenType::LParen, char::to_string(&c))),
+                ')' => tokens.push(self.create_token(TokenType::RParen, char::to_string(&c))),
+                ';' => tokens.push(self.create_token(TokenType::Semicolon, char::to_string(&c))),
+                '[' => tokens.push(self.create_token(TokenType::LSquare, char::to_string(&c))),
+                ']' => tokens.push(self.create_token(TokenType::RSquare, char::to_string(&c))),
                 ':' => if self.match_next(':') {
                     tokens.push(self.create_token(TokenType::DoubleColon, "::".to_string()))
                 } else {
@@ -46,13 +55,6 @@ impl Lexer {
                 } else {
                     tokens.push(self.create_token(TokenType::Minus, char::to_string(&c)))
                 },
-                '*' => tokens.push(self.create_token(TokenType::Star, char::to_string(&c))),
-                '^' => tokens.push(self.create_token(TokenType::Caret, char::to_string(&c))),
-                '{' => tokens.push(self.create_token(TokenType::LBrace, char::to_string(&c))),
-                '}' => tokens.push(self.create_token(TokenType::RBrace, char::to_string(&c))),
-                '(' => tokens.push(self.create_token(TokenType::LParen, char::to_string(&c))),
-                ')' => tokens.push(self.create_token(TokenType::RParen, char::to_string(&c))),
-                ';' => tokens.push(self.create_token(TokenType::Semicolon, char::to_string(&c))),
                 '/' => if self.match_next('/') {
                     while !self.at_end() && self.peek() != '\n' { self.inc_indexes(); }
                     continue;

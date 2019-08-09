@@ -52,6 +52,7 @@ pub enum TokenType {
     Colon, DoubleColon,
     Typename,
     Return,
+    LSquare, RSquare,
     Dot, DoubleDot,
     If, Else, While, Match,
     Record, Type,

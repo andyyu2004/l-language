@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter, Error};
 use crate::parsing::expr::{format_tuple, format_record};
 use LType::{TBool,TArrow,TTuple,TUnit,TNum,TTop};
-use crate::types::l_types::LType::{TRecord, TName, TNothing, TVariant, TData};
+use crate::types::l_types::LType::{TRecord, TName, TNothing, TVariant, TData, TList};
 use crate::interpreting::Env;
 use crate::types::LTypeError;
 use crate::lexing::Token;
@@ -17,6 +17,7 @@ pub enum LType {
     TArrow(Box<LType>, Box<LType>),
     TTuple(Vec<LType>),
     TRecord(HashMap<String, LType>),
+    TList(Box<LType>),
     TUnit,
     TVariant(HashMap<String, LType>),
     TName(Token),
@@ -30,6 +31,7 @@ impl LType {
             TTop=> Ok(TTop),
             TBool => Ok(TBool),
             TNum => Ok(TNum),
+            TList(t) => Ok(TList(Box::new(t.map_string_to_type(env)?))),
             TArrow(l, r) => Ok(TArrow(Box::new(l.map_string_to_type(env)?), Box::new(r.map_string_to_type(env)?))),
             TTuple(xs) => Ok(TTuple(xs.into_iter().map(|x| x.map_string_to_type(env)).collect::<Result<Vec<_>, _>>()?)),
             TRecord(xs) | TVariant(xs) => {
@@ -57,6 +59,7 @@ impl Display for LType {
             TBool => write!(f, "Bool"),
             TNum => write!(f, "Number"),
             TUnit => write!(f, "Unit"),
+            TList(x) => write!(f, "[{}]", x),
             TName(s) => write!(f, "'{}", s),
             TNothing => write!(f, "TNothing"),
             TRecord(xs) | TVariant(xs) => write!(f, "{{{}}}", format_record(xs, ", ")),
@@ -96,7 +99,7 @@ impl PartialEq for LType {
             (TTuple(xs), TUnit) => xs.is_empty(), // TUnit is just convenient way to represent empty tuple
             (TUnit, TTuple(ys)) => ys.is_empty(),
             (TTuple(xs), TTuple(ys)) => if xs.len() == 1 { &xs[0] == ys } // Allow nested singleton tuple equivalence
-            else if ys.len() == 1 { &ys[0] == xs } else { xs == ys },
+                else if ys.len() == 1 { &ys[0] == xs } else { xs == ys },
             (TTuple(xs), t) => xs.len() == 1 && t == &xs[0], // Order matters for some reason for eq
             (t, TTuple(ys)) => ys.len() == 1 && t == &ys[0],
 //            (TTuple(xs), t) => xs.len() == 1 && &xs[0] == t, // Singleton tuple is equivalent to the containing type
@@ -105,6 +108,7 @@ impl PartialEq for LType {
             // Order is not important, but naming is in records
             (TRecord(xs), TRecord(ys)) => xs == ys,
 //                 xs.iter().map(|x| &x.value).collect::<Vec<&LType>>() == ys.iter().map(|y| &y.value).collect::<Vec<&LType>>(),
+            (TList(x), TList(y)) => x == y,
             _ => false
         }
     }

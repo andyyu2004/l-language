@@ -6,10 +6,10 @@ use crate::errors::LError;
 use crate::types::LType;
 use crate::types::l_types::Pair;
 use crate::parsing::stmt::Stmt::{FnStmt, LetStmt, FnCurried, VarStmt, ReturnStmt, TypeAlias, WhileStmt, StructDecl, DataDecl};
-use crate::types::l_types::LType::{TTuple, TRecord, TName, TArrow, TUnit};
-use crate::parsing::expr::Expr::{EApplication, EBinary, EUnary, ELiteral, EVariable, EAssignment, EIf, EBlock, ERecord, ELogic, EGet, ESet, EDataConstructor, EMatch, EIfLet};
+use crate::types::l_types::LType::{TTuple, TRecord, TName, TArrow, TUnit, TList};
+use crate::parsing::expr::Expr::{EApplication, EBinary, EUnary, ELiteral, EVariable, EAssignment, EIf, EBlock, ERecord, ELogic, EGet, ESet, EDataConstructor, EMatch, EIfLet, EList};
 use std::fmt::{Display};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use crate::lexing::token::TokenType::{Plus, Minus};
 use crate::interpreting::pattern_matching::LPattern;
 
@@ -278,6 +278,7 @@ impl Parser {
         ltype
     }
 
+    // Primitive means NON-ARROW in this context
     fn parse_primitive_type(&mut self) -> Result<LType, LError> {
         if self.match1(TokenType::LParen) {
             // Ambiguous between parentheses and tuple
@@ -292,6 +293,8 @@ impl Parser {
             expr
         } else if self.match1(TokenType::LBrace) {
             Ok(TRecord(self.parse_record(&Parser::parse_type)?))
+        } else if self.match1(TokenType::LSquare) {
+            Ok(TList(Box::new(self.parse_type()?)))
         } else {
             let typename= self.expect(TokenType::Typename)?;
             Ok(TName(typename.clone()))
@@ -350,10 +353,14 @@ impl Parser {
     }
 
     fn parse_variant_type(&mut self, mut t: LType) -> Result<LType, LError> {
-        // Build from the right in reverse, seems to work, correct order and associativity
+        let mut v = vec![];
         while self.current().ttype != TokenType::Pipe && self.current().ttype != TokenType::Semicolon && self.current().ttype != TokenType::EOF {
-            t = TArrow(Box::new(self.parse_primitive_type()?), Box::new(t))
+            v.push(self.parse_primitive_type()?);
         }
+        for ltype in v.into_iter().rev() {
+            t = TArrow(Box::new(ltype), Box::new(t))
+        }
+        println!("type: {}", t);
         Ok(t)
     }
 
@@ -663,6 +670,10 @@ impl Parser {
             let token = self.previous().clone();
             Ok(ERecord(token, self.parse_record(&Parser::parse_expression)?))
 //            self.parse_record(&Parser::parse_expression).map(ERecord)?
+        } else if self.match1(TokenType::LSquare) {
+            let token = self.previous().clone();
+            let partial = |x| EList(token, x);
+            self.parse_list().map(partial)
         } else {
             let t = self.current();
             Err(LError::from_token(format!("Unexpected token (primary): {}", t), t))
@@ -680,6 +691,18 @@ impl Parser {
             } {}
         }
         self.expect(TokenType::RParen)?;
+        Ok(v)
+    }
+
+    fn parse_list(&mut self) -> Result<VecDeque<Expr>, LError> {
+        let mut v = VecDeque::new();
+        if self.current().ttype != TokenType::RSquare {
+            while { // Cheap do-while loop
+                v.push_back(self.parse_expression()?);
+                self.match1(TokenType::Comma)
+            } {}
+        }
+        self.expect(TokenType::RSquare)?;
         Ok(v)
     }
 

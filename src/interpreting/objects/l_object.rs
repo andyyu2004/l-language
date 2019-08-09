@@ -1,11 +1,11 @@
 use LObject::{LNumber, LString, LBool, LUnit};
 use std::fmt::{Display, Formatter, Error};
 use crate::parsing::expr::{format_tuple, format_record};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::cell::RefCell;
 use std::rc::Rc;
-use itertools::Itertools;
-use crate::interpreting::objects::l_object::LObject::{LRecord, LVariant, LTuple, LFunction, LStruct};
+use itertools::{Itertools, join};
+use crate::interpreting::objects::l_object::LObject::{LRecord, LVariant, LTuple, LFunction, LStruct, LList};
 use crate::interpreting::objects::{Function, Variant, Struct, Tuple};
 use crate::interpreting::pattern_matching::Matchable;
 use crate::interpreting::{LPattern, Interpreter};
@@ -22,6 +22,7 @@ pub enum LObject {
     LFunction(Function),
     LStruct(Struct),
     LVariant(Variant),
+    LList(VecDeque<Rc<RefCell<LObject>>>),
     LUnit
 }
 
@@ -102,6 +103,7 @@ impl Display for LObject {
             LUnit => write!(f, "()"),
             LFunction(function) => write!(f, "{}", function),
             LTuple(xs) => write!(f, "{}", xs),
+            LList(xs) => write!(f, "[{}]", format_tuple(&xs.iter().map(|x| x.borrow().clone()).collect_vec())),
             LVariant(variant) => write!(f, "{}", variant),
             LRecord(xs) => {
                 let mut ys = HashMap::new();
