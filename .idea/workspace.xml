@@ -5,25 +5,19 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="87d7f893-1b77-4ef4-9c5e-a4c1289b1105" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/test_interpreter.bash" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/random.txt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/adt.l" beforeDir="false" afterPath="$PROJECT_DIR$/adt.l" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/interpreterhistory.txt" beforeDir="false" afterPath="$PROJECT_DIR$/interpreterhistory.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/generation/function_generation.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/generation/function_generation.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/generation/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/generation/mod.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/interpreting/interpreter.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/interpreting/interpreter.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/interpreting/objects/l_object.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/interpreting/objects/l_object.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/interpreting/objects/l_tuple.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/interpreting/objects/l_tuple.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/interpreting/objects/l_variant.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/interpreting/objects/l_variant.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/interpreting/pattern_matching/matchable.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/interpreting/pattern_matching/matchable.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/interpreting/pattern_matching/pattern.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/interpreting/pattern_matching/pattern.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/lexing/lexer.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/lexing/lexer.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/lexing/token.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/lexing/token.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/main.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/parsing/expr.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/parsing/expr.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/parsing/parser.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/parsing/parser.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/static_analysis/static_analyser.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/static_analysis/static_analyser.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/static_analysis/static_info.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/static_analysis/static_info.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/types/l_types.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/types/l_types.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/types/type_checker.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/types/type_checker.rs" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -99,6 +93,7 @@
     <option name="toolchainHomeDirectory" value="$USER_HOME$/.cargo/bin" />
     <option name="version" value="2" />
   </component>
+  <component name="ShelveChangesManager" show_recycled="true" />
   <component name="SvnConfiguration">
     <configuration />
   </component>
@@ -111,6 +106,9 @@
       <updated>1564287601665</updated>
     </task>
     <servers />
+  </component>
+  <component name="UnknownFeatures">
+    <option featureType="com.intellij.fileTypeFactory" implementationName="*.cs" />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
     <option name="TAB_STATES">

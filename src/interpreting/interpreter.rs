@@ -12,12 +12,11 @@ use std::collections::{HashMap, VecDeque};
 use std::rc::Rc;
 use std::cell::{RefCell};
 use crate::lexing::token::TokenType::{BangEqual, DoubleEqual, LessEqual, GreaterEqual, Caret, Slash, Plus, Star, Less, Minus, Greater};
-use crate::types::l_types::LType::{TArrow, TName, TRecord, TTuple, TBool, TUnit};
-use crate::generation::{generate_function_from_type, Generator};
+use crate::types::l_types::LType::{TArrow};
+use crate::generation::{Generator};
 use crate::interpreting::pattern_matching::Matchable;
 use crate::interpreting::objects::l_object::LObject::{LFunction, LNumber, LBool, LVariant, LRecord, LTuple, LUnit, LStruct, LList, LString};
 use crate::interpreting::objects::{LObject, LInvocable, Variant, Function, Struct, Tuple};
-use itertools::Itertools;
 
 pub struct Interpreter {
     pub env: Rc<RefCell<Env<Option<Rc<RefCell<LObject>>>>>>,
@@ -137,32 +136,32 @@ impl Interpreter {
 
     // Pass environment back to caller, hard to get lifetimes right
     pub fn execute_block(&mut self, statements: &Vec<Stmt>, env: Rc<RefCell<Env<Option<Rc<RefCell<LObject>>>>>>) -> Result<Rc<RefCell<LObject>>, InterpreterError> {
-         let enclosing = Rc::clone(&self.env);
-         self.env = env;
+        let enclosing = Rc::clone(&self.env);
+        self.env = env;
+        let mut statements = statements.clone();
 
-         let mut statements = statements.clone();
-         let last = statements.pop();
-         for stmt in statements {
-             let x = self.execute(stmt);
-             // Consider return when in block thats not a functional block
-             if let Err(Return(obj)) = x { // Intercept return value and handle appropriately
-                 self.env = enclosing.clone();
-                 return Ok(obj)
-             } else if let Err(error) = x {
+        let last = statements.pop();
+        for stmt in statements {
+            let x = self.execute(stmt);
+            // Consider return when in block thats not a functional block
+                if let Err(Return(obj)) = x { // Intercept return value and handle appropriately
+                self.env = enclosing.clone();
+                return Ok(obj)
+            } else if let Err(error) = x {
                  return Err(error)
-             }
-         }
+            }
+        }
 
-         let ret_val = if let Some(stmt) = last {
-             match stmt {
-                 LStmt(ref e) => self.evaluate(e)?,
-                 ReturnStmt { ref value, .. } => match value {
-                     Some(expr) => self.evaluate(expr)?,
-                     None => self.wrap(LUnit)
-                 },
-                 _ => { self.execute(stmt)?; self.wrap(LUnit) }
-             }
-         } else { self.wrap(LUnit) };
+        let ret_val = if let Some(stmt) = last {
+            match stmt {
+                LStmt(ref e) => self.evaluate(e)?,
+                ReturnStmt { ref value, .. } => match value {
+                    Some(expr) => self.evaluate(expr)?,
+                    None => self.wrap(LUnit)
+                },
+                _ => { self.execute(stmt)?; self.wrap(LUnit) }
+            }
+        } else { self.wrap(LUnit) };
 
         self.env = enclosing;
         Ok(ret_val)
@@ -330,8 +329,8 @@ impl Interpreter {
     }
 
     fn evaluate_if_let(&mut self, token: &Token, pattern: &LPattern, scrutinee: &Expr, left: &Vec<Stmt>, right: &Expr) -> Result<Rc<RefCell<LObject>>, InterpreterError> {
-        let mut s_obj = self.evaluate(scrutinee)?; // .borrow() as &dyn Matchable;
-        let matched = s_obj.borrow().is_match(pattern);
+        let s_obj = self.evaluate(scrutinee)?; // .borrow() as &dyn Matchable;
+        let matched = s_obj.borrow_mut().is_match(pattern);
         if matched {
             let mut env = Env::new(Some(Rc::clone(&self.env)));
             let bindings = s_obj.borrow_mut().bindings(pattern);

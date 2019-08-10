@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 pub trait Matchable<T> {
 
-    fn is_match(&self, pattern: &LPattern) -> bool;
+    fn is_match(&mut self, pattern: &LPattern) -> bool;
 
     // bool indicating match success or failure, and vector of pairs of name value bindings
     fn bindings(&mut self, pattern: &LPattern) -> Vec<(String, T)>; // {

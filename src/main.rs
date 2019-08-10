@@ -97,7 +97,7 @@ fn main() {
             },
         };
 
-        println!("{:#?}", tokens);
+        // println!("{:#?}", tokens);
 
         let mut parser = Parser::new(tokens, Mode::Interactive);
 
@@ -173,6 +173,7 @@ pub fn execute(input: String) {
     };
 
     let mut parser = Parser::new(tokens, Mode::Interpreted);
+
     let statements = match parser.parse() {
         Ok(s) => s,
         Err(errors) => {

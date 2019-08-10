@@ -79,7 +79,7 @@ impl StaticAnalyser {
         match expr {
             EVariable { name, .. } => self.analyse_var(name),
             EApplication { callee, arg , .. } => self.analyse_application(callee, arg),
-            EDataConstructor { name } => self.env.borrow().resolve(name),
+            EDataConstructor { name } => self.analyse_data_constructor(name),
             ERecord(token, xs) => self.analyse_record(token, xs),
             ETuple(_, xs) => { for x in xs { self.analyse_expr(x)?; } ; Ok(IEmpty) },
             EAssignment { lvalue, expr } => self.analyse_assignment(lvalue, expr),
@@ -94,6 +94,13 @@ impl StaticAnalyser {
             ELogic { operator, left, right} | EBinary { operator, left, right } =>
                 self.analyse_binary(operator, left, right),
             _ => Ok(IEmpty)
+        }
+    }
+
+    fn analyse_data_constructor(&self, name: &Token) -> Result<StaticInfo, LError> {
+        match self.env.borrow().resolve(name) {
+            Ok(x) => Ok(x),
+            Err(_) => Err(LError::from_token(format!("Undefined Data Constructor {}", name.lexeme), name))
         }
     }
 
@@ -146,7 +153,7 @@ impl StaticAnalyser {
         let constructor_data = self.env.borrow().resolve(cname)?;
         if let IConstructor(arity) = constructor_data {
             let p_arity = pattern.constructor_arity();
-            println!("pattern {}, arity {}", pattern, p_arity);
+//            println!("pattern {}, arity {}", pattern, p_arity);
             if  p_arity != arity {
                 Err(LError::from_token(format!("The constructor '{}' expected {} arguments, got {}", cname.lexeme, arity, p_arity), cname))
             } else { Ok(()) }

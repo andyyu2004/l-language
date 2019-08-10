@@ -70,26 +70,26 @@ impl LObject {
 
     pub fn variant(&self) -> &Variant {
         if let LVariant(variant) = self { variant }
-        else { panic!("Expected LObject to be a variant") }
+        else { panic!("Expected LObject to be a variant, found {}", self) }
     }
 
     pub fn variant_mut(&mut self) -> &mut Variant {
         if let LVariant(variant) = self { variant }
-        else { panic!("Expected LObject to be a variant") }
+        else { panic!("Expected LObject to be a variant, found {}", self) }
     }
 
 }
 
 impl Matchable<Self> for LObject {
-    fn is_match(&self, pattern: &LPattern) -> bool {
+    fn is_match(&mut self, pattern: &LPattern) -> bool {
         match pattern {
             PConstructor(l, r) => false,
             PIdentifier(x) => true,
             PWildcard => true,
-            PTuple(_) => self.tuple().is_match(pattern),
+            PTuple(_) => self.tuple_mut().is_match(pattern),
             PRecord => false,
             PLiteral(x) => Interpreter::literal_to_l_object(x).borrow().deref() == self,
-            PVariant(..) => self.variant().is_match(pattern),
+            PVariant(..) => self.variant_mut().is_match(pattern),
         }
     }
 

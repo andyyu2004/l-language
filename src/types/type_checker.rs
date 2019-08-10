@@ -20,7 +20,10 @@ use std::ops::Deref;
 pub struct TypeChecker {
     env: Rc<RefCell<Env<LType>>>, // Variable -> Type
     types: Env<LType>, // Typename -> Type
-    curr_fn_ret_type: Option<LType>,
+    curr_fn_ret_type: Option<LType>, // Type check return statements
+    // Some helper for typechecking recursive curried definitions
+    curr_ftype: Option<LType>,
+    curr_fname: Option<String>,
     mode: Mode
 }
 
@@ -35,6 +38,8 @@ impl TypeChecker {
         TypeChecker {
             env: Rc::new(RefCell::new(Env::new(None))),
             curr_fn_ret_type: None,
+            curr_ftype: None,
+            curr_fname: None,
             types,
             mode
         }
@@ -469,17 +474,29 @@ impl TypeChecker {
             .collect::<Result<Vec<LType>, LTypeError>>()?;
         let ftype = TArrow(Box::new(TTuple(ptypes.clone())), Box::new(ret.clone()));
 
-        let enclosing = self.env.clone();
-        let env = Env::new(Some(self.env.clone()));
+        let enclosing = Rc::clone(&self.env);
+        let env = Env::new(Some(Rc::clone(&self.env)));
+
         for (i, param) in params.iter().enumerate() {
             self.env.borrow_mut().define(param.name.clone(), ptypes[i].clone());
         }
-        // Allow typechecking of recursive types. Assume it has type stated in fn definition. Think this works?
+
+        if let Some(fname) = &self.curr_fname {
+            // Takes the accumulated type and adds the parameter here and the return type to form the full type for a curried function
+            self.curr_ftype = Some(TArrow(
+                Box::new(self.curr_ftype.clone().unwrap()), Box::new(
+                    TArrow(Box::new(ptypes[0].clone()), Box::new(ret.clone()))
+                )
+            ));
+            self.env.borrow_mut().define(fname.clone(), self.curr_ftype.clone().unwrap())
+        }
+
+        // Allows typechecking of recursive types. Assume it has type stated in fn definition.
         if let Some(name) = name {
             self.env.borrow_mut().define(name.clone(), ftype.clone())
         }
 
-        let dummy_ret = ReturnStmt { token: token.clone(), value: Some(ELiteral(token.clone())) };
+        let dummy_ret = ReturnStmt { token: Token::dummy(), value: Some(ELiteral(Token::dummy())) };
         let has_explicit_ret = body.iter().any(|x| self.match_discriminant(x, &dummy_ret));
         let block_type = self.type_of_block_e(body)?;
         if block_type != ret && !has_explicit_ret {
@@ -488,10 +505,6 @@ impl TypeChecker {
 
         self.env = enclosing;
 
-        if let Some(name) = name {
-            self.env.borrow_mut().define(name.clone(), ftype.clone());
-        }
-
         self.curr_fn_ret_type = prev_ret_type;
         Ok(ftype)
     }
@@ -499,13 +512,32 @@ impl TypeChecker {
     fn type_of_curried_fn(&mut self, name: &Option<String>, ntpair: &Pair<LType>, ret: &Stmt) -> Result<LType, LTypeError> {
         let enclosing = self.env.clone();
         self.env = Rc::new(RefCell::new(Env::new(Some(self.env.clone()))));
+
         let ptype = ntpair.value.clone().map_string_to_type(&self.types)?;
+
+        if let Some(name) = name {
+            self.curr_fname = Some(name.clone())
+        }
+
+        // Accumulating the type in a self variable to allow for recursive definitions
+        match &self.curr_ftype {
+            Some(t) => self.curr_ftype = Some(TArrow(Box::new(t.clone()), Box::new(ptype.clone()))),
+            None => self.curr_ftype = Some(ptype.clone())
+        }
+
         self.env.borrow_mut().define(ntpair.name.clone(), ptype.clone());
-        let ftype = TArrow(Box::new(ptype), Box::new(self.type_of_statement(ret)?));
+        self.type_of_statement(ret)?;
+//        let ftype = TArrow(Box::new(ptype), Box::new(self.type_of_statement(ret)?));
+
         self.env = enclosing;
+
+
+        let ftype = self.curr_ftype.clone().unwrap();
         if let Some(name) = name {
             self.env.borrow_mut().define(name.clone(), ftype.clone());
         }
+        self.curr_ftype = None;
+        self.curr_fname = None;
         Ok(ftype)
     }
 

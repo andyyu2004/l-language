@@ -362,7 +362,7 @@ impl Parser {
         for ltype in v.into_iter().rev() {
             t = TArrow(Box::new(ltype), Box::new(t))
         }
-        println!("type: {}", t);
+//        println!("type: {}", t);
         Ok(t)
     }
 

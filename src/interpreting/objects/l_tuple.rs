@@ -21,12 +21,12 @@ impl Tuple {
 }
 
 impl Matchable<LObject> for Tuple {
-    fn is_match(&self, pattern: &LPattern) -> bool {
+    fn is_match(&mut self, pattern: &LPattern) -> bool {
         if let PTuple(ps) = pattern {
             // Type checker will ensure length is correct
             self.elements.iter()
                 .zip(ps)
-                .all(|(x, p)| x.borrow().is_match(p))
+                .all(|(x, p)| x.borrow_mut().is_match(p))
         } else { false }
     }
 
