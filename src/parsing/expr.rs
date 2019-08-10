@@ -15,8 +15,8 @@ pub enum Expr {
     EUnary { operator: Token, operand: Box<Expr> },
     ELogic { operator: Token, left: Box<Expr>, right: Box<Expr> },
     EVariable { name: Token },
+    EDataConstructor { name: Token }, // Like variable but starts with capital letter
     EMatch { token: Token, expr: Box<Expr>, branches: Vec<(LPattern, Expr)>}, // Use vec as order is important
-    EDataConstructor { name: Token },
     EBlock(Vec<Stmt>),
     EGet { name: Token, expr: Box<Expr> }, // .
 //    EGetS { name: Token, expr: Box<Expr> }, ::
@@ -27,9 +27,9 @@ pub enum Expr {
     ETuple(Token, Vec<Expr>),
     ERecord(Token, HashMap<String, Expr>),
     EIf { token: Token, condition: Box<Expr>, left: Box<Expr>, right: Box<Expr> },
-    // Using Vector for left as it may require variable insertion into env and block evaluation builds empty env automatically
+    // Using Vec<Stmt> instead of Expr for left side as it may require manual variable insertion into env but EBlock evaluation builds empty env automatically
     EIfLet { token: Token, pattern: LPattern, scrutinee: Box<Expr>, left: Vec<Stmt>, right: Box<Expr> },
-    EVariant(String, Box<Expr>),
+    EVariant(String, Vec<Expr>),
     EList(Token, VecDeque<Expr>), // Efficient insertion from both ends
 }
 
@@ -49,7 +49,7 @@ impl Display for Expr {
             EAssignment { lvalue, expr} => write!(f, "{} = {}", lvalue, expr),
             EApplication { callee, arg, .. } => write!(f, "{} {}", callee, arg),
             ELogic { operator, left, right } => write!(f, "{}{{{}}}{{{}}}", operator, left, right),
-            EVariant(name, expr) => write!(f, "variant {}: {}", name, expr),
+            EVariant(name, xs) => write!(f, "variant {}: {}", name, join(xs, " ")),
             EMatch { expr, branches,.. } => write!(f, "match {} {{{}}}", expr, format_paired_vec(branches, " | ")),
             EList(_, xs) => write!(f, "[{}]", join(xs, ", ")),
             EIf { token, condition, left, right } => match **right {

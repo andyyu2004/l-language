@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 use rustyline::Editor;
 use rustyline::error::ReadlineError;
 
@@ -96,7 +97,7 @@ fn main() {
             },
         };
 
-//        println!("{:#?}", tokens);
+        println!("{:#?}", tokens);
 
         let mut parser = Parser::new(tokens, Mode::Interactive);
 

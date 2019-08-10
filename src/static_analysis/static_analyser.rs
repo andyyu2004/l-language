@@ -4,7 +4,7 @@ use crate::parsing::stmt::Stmt::{LStmt, ExprStmt, VarStmt, LetStmt, FnStmt, FnCu
 use crate::interpreting::{Env, LPattern};
 use crate::parsing::expr::Expr::{EVariable, EApplication, EAssignment, EBlock, EIf, ERecord, ELogic, EBinary, EGet, ETuple, ESet, EDataConstructor, EMatch, EIfLet, EList};
 use crate::static_analysis::StaticInfo;
-use crate::static_analysis::static_info::StaticInfo::{IVariable, ILetBinding, IFunction, IEmpty};
+use crate::static_analysis::static_info::StaticInfo::{IVariable, ILetBinding, IFunction, IEmpty, IConstructor};
 use crate::lexing::Token;
 use crate::types::l_types::Pair;
 use crate::types::LType;
@@ -58,10 +58,17 @@ impl StaticAnalyser {
                 self.analyse_block_e(body)
             }
             TypeAlias {..} => Ok(IEmpty),
-            DataDecl { .. } => Ok(IEmpty),
+            DataDecl { name, variants } => self.analyse_data_decl(name, variants),
             StructDecl { name, fields} => self.analyse_struct(name, fields),
             x => unimplemented!("Unimplemented in analyse stmt {}", x)
         }
+    }
+
+    fn analyse_data_decl(&self, name: &Token, variants: &HashMap<String, LType>) -> Result<StaticInfo, LError> {
+        for (k, v) in variants {
+            self.env.borrow_mut().define(k.clone(), IConstructor(v.curried_arity()));
+        }
+        Ok(IEmpty)
     }
 
     fn analyse_struct(&self, name: &Token, fields: &HashMap<String, LType>) -> Result<StaticInfo, LError> {
@@ -71,12 +78,10 @@ impl StaticAnalyser {
     fn analyse_expr(&mut self, expr: &Expr) -> Result<StaticInfo, LError> {
         match expr {
             EVariable { name, .. } => self.analyse_var(name),
-            EApplication { callee, arg , .. } => {
-                self.analyse_expr(arg)?;
-                self.analyse_expr(callee)
-            },
+            EApplication { callee, arg , .. } => self.analyse_application(callee, arg),
+            EDataConstructor { name } => self.env.borrow().resolve(name),
             ERecord(token, xs) => self.analyse_record(token, xs),
-            ETuple(_, xs) => { for x in xs { self.analyse_expr(x)?; } ; Ok(IEmpty) }
+            ETuple(_, xs) => { for x in xs { self.analyse_expr(x)?; } ; Ok(IEmpty) },
             EAssignment { lvalue, expr } => self.analyse_assignment(lvalue, expr),
             EBlock(xs) => self.analyse_block_e(xs),
             EIf { condition, left, right, .. } => self.analyse_if(condition, left, right),
@@ -88,9 +93,13 @@ impl StaticAnalyser {
             EMatch { token, expr, branches} => self.analyse_match(token, expr, branches),
             ELogic { operator, left, right} | EBinary { operator, left, right } =>
                 self.analyse_binary(operator, left, right),
-//            ETVariable { name } => Ok(IEmpty),
             _ => Ok(IEmpty)
         }
+    }
+
+    fn analyse_application(&mut self, callee: &Expr, arg: &Expr) -> Result<StaticInfo, LError> {
+        self.analyse_expr(arg)?;
+        self.analyse_expr(callee)
     }
 
     fn analyse_match(&mut self, token: &Token, expr: &Expr, branches: &Vec<(LPattern, Expr)>) -> Result<StaticInfo, LError> {
@@ -107,24 +116,42 @@ impl StaticAnalyser {
 
     fn analyse_if_let(&mut self, token: &Token, pattern: &LPattern, scrutinee: &Expr, left: &Vec<Stmt>, right: &Expr) -> Result<StaticInfo, LError> {
         self.analyse_expr(scrutinee)?;
-        let bindings = self.get_pattern_bindings(pattern);
+        let bindings = self.get_pattern_bindings(pattern)?;
         let mut env = Env::new(Some(Rc::clone(&self.env)));
         for (k, v) in bindings { env.define(k,  v); }
         self.analyse_block(left, Rc::new(RefCell::new(env)))?;
         self.analyse_expr(right)
     }
 
-    // Returns the bindings that would occur if a pattern is matched
-    fn get_pattern_bindings(&self, pattern: &LPattern) -> Vec<(String, StaticInfo)> {
+    // Returns the bindings that would occur if a pattern is matched to allow checking for variables
+    fn get_pattern_bindings(&self, pattern: &LPattern) -> Result<Vec<(String, StaticInfo)>, LError> {
         match pattern {
-            PVariant(name, p) => if let Some(ref p) = **p {
+            PVariant(name, p) => if let Some(p) = p {
+                self.validate_constructor_arity(name, p)?;
                 self.get_pattern_bindings(p)
-            } else { vec![] },
-            PRecord => vec![],
-            PTuple(xs) => xs.iter().flat_map(|x| self.get_pattern_bindings(x)).collect::<Vec<_>>(),
-            PLiteral(x) => vec![],
-            PIdentifier(x) => vec![(x.lexeme.clone(), IEmpty)],
-            PWildcard => vec![]
+            } else { Ok(vec![]) },
+            PConstructor(l, r) => Ok(self.get_pattern_bindings(l)?.into_iter().chain(self.get_pattern_bindings(r)?).collect_vec()),
+            PRecord => Ok(vec![]),
+            PTuple(xs) => Ok(xs.iter()
+                .flat_map(|x| self.get_pattern_bindings(x))
+                .flatten()
+                .collect_vec()),
+            PLiteral(x) => Ok(vec![]),
+            PIdentifier(x) => Ok(vec![(x.lexeme.clone(), IEmpty)]),
+            PWildcard => Ok(vec![])
+        }
+    }
+
+    fn validate_constructor_arity(&self, cname: &Token, pattern: &LPattern) -> Result<(), LError> {
+        let constructor_data = self.env.borrow().resolve(cname)?;
+        if let IConstructor(arity) = constructor_data {
+            let p_arity = pattern.constructor_arity();
+            println!("pattern {}, arity {}", pattern, p_arity);
+            if  p_arity != arity {
+                Err(LError::from_token(format!("The constructor '{}' expected {} arguments, got {}", cname.lexeme, arity, p_arity), cname))
+            } else { Ok(()) }
+        } else {
+            panic!("Constructor had non constructor information")
         }
     }
 

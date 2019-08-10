@@ -4,8 +4,8 @@ use crate::parsing::{Expr, Stmt, Mode};
 use crate::errors::LError;
 use crate::types::l_types::Pair;
 use crate::types::LType;
-use crate::parsing::stmt::Stmt::{ExprStmt, LStmt, VarStmt, LetStmt, FnStmt, FnCurried, ReturnStmt, PrintStmt, TypeAlias, WhileStmt, StructDecl, DataDecl};
-use crate::parsing::expr::Expr::{EUnary, EApplication, EVariable, ELiteral, EBinary, ETuple, EAssignment, EBlock, EIf, ERecord, ELogic, EGet, ESet, EDataConstructor, EVariant, EIfLet, EList};
+use crate::parsing::stmt::Stmt::*;
+use crate::parsing::expr::Expr::*;
 use std::panic;
 use crate::interpreting::interpreter_error::InterpreterError::{Return};
 use std::collections::{HashMap, VecDeque};
@@ -13,10 +13,11 @@ use std::rc::Rc;
 use std::cell::{RefCell};
 use crate::lexing::token::TokenType::{BangEqual, DoubleEqual, LessEqual, GreaterEqual, Caret, Slash, Plus, Star, Less, Minus, Greater};
 use crate::types::l_types::LType::{TArrow, TName, TRecord, TTuple, TBool, TUnit};
-use crate::generation::generate_function_from_type;
+use crate::generation::{generate_function_from_type, Generator};
 use crate::interpreting::pattern_matching::Matchable;
-use crate::interpreting::objects::l_object::LObject::{LFunction, LNumber, LBool, LVariant, LRecord, LTuple, LUnit, LStruct, LList};
+use crate::interpreting::objects::l_object::LObject::{LFunction, LNumber, LBool, LVariant, LRecord, LTuple, LUnit, LStruct, LList, LString};
 use crate::interpreting::objects::{LObject, LInvocable, Variant, Function, Struct, Tuple};
+use itertools::Itertools;
 
 pub struct Interpreter {
     pub env: Rc<RefCell<Env<Option<Rc<RefCell<LObject>>>>>>,
@@ -70,28 +71,12 @@ impl Interpreter {
 
     fn execute_data_decl(&mut self, name: Token, variants: HashMap<String, LType>) -> Result<(), InterpreterError> {
         for (k, v) in &variants {
-//            let f = generate_function_from_type(&v, EVariant)?;
             if let TArrow(l, r) = v {
-                self.execute(FnStmt {
-                    name: Some(k.clone()),
-                    token: Token::dummy(),
-                    params: vec![Pair::new("x".to_string(), *l.clone())],
-                    ret_type: *r.clone(),
-                    body: vec![
-//                        PrintStmt (
-//                            EVariable {
-//                                name: Token::new(TokenType::Identifier, "x".to_string(), -1, -1)
-//                            }
-//                        ),
-                        ReturnStmt {
-                            token: Token::dummy(),
-                            value: Some(EVariant(k.clone(), Box::new(EVariable {
-                                name: Token::new(TokenType::Identifier, "x".to_string(), -1, -1)
-                            })))
-                        }]
-                })?;
+                // Generates some L code that is a function that returns a variant (to allow partial application)
+                let f = Generator::new(k.clone()).generate_function_from_type(v)?;
+                self.execute(f)?;
             } else {
-                self.env.borrow_mut().define(k.clone(), Some(self.wrap(LVariant(Variant::new(k.clone(), self.wrap(LUnit))))))
+                self.env.borrow_mut().define(k.clone(), Some(self.wrap(LVariant(Variant::new(k.clone(), vec![self.wrap(LUnit)])))))
             }
         }
         Ok(())
@@ -243,7 +228,7 @@ impl Interpreter {
                 _ => unreachable!()
             },
             ELiteral(token) => Ok(Interpreter::literal_to_l_object(token)),
-            EVariable { name, ..} | EDataConstructor { name } => self.evaluate_variable(name),
+            EDataConstructor { name} | EVariable { name, .. } => self.evaluate_variable(name),
             ETuple(_, xs) => Ok(Rc::new(RefCell::new(LTuple(Tuple::new(
                 xs.iter().map(|x| self.evaluate(x)).collect::<Result<Vec<Rc<RefCell<LObject>>>, _>>()?
             ))))),
@@ -255,7 +240,7 @@ impl Interpreter {
             EGet { name, expr } => self.evaluate_get_expr(name, expr),
             ESet { name, expr, value } => self.evaluate_set_expr(name, expr, value),
             EVariant(name, expr) => {
-                let obj = self.evaluate(expr)?;
+                let obj = expr.iter().map(|x| self.evaluate(x)).collect::<Result<Vec<_>,_>>()?;
                 Ok(self.wrap(LVariant(Variant::new(name.clone(), obj))))
             },
             EIfLet { token, pattern, scrutinee, left, right } =>
@@ -345,11 +330,11 @@ impl Interpreter {
     }
 
     fn evaluate_if_let(&mut self, token: &Token, pattern: &LPattern, scrutinee: &Expr, left: &Vec<Stmt>, right: &Expr) -> Result<Rc<RefCell<LObject>>, InterpreterError> {
-        let s_obj = self.evaluate(scrutinee)?; // .borrow() as &dyn Matchable;
+        let mut s_obj = self.evaluate(scrutinee)?; // .borrow() as &dyn Matchable;
         let matched = s_obj.borrow().is_match(pattern);
         if matched {
             let mut env = Env::new(Some(Rc::clone(&self.env)));
-            let bindings = s_obj.borrow().bindings(pattern);
+            let bindings = s_obj.borrow_mut().bindings(pattern);
             for (k, v) in bindings {
                 env.define(k, Some(self.wrap(v)));
             }
@@ -372,6 +357,7 @@ impl Interpreter {
         let obj = match literal.ttype {
             TokenType::True => LBool(true),
             TokenType::False => LBool(false),
+            TokenType::String => LString(literal.lexeme.clone()),
             TokenType::Number => LNumber(literal.lexeme.parse::<f64>().expect("Failed to parse float")),
             _ => panic!("Invalid literal conversion")
         };

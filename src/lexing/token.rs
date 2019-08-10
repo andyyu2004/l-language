@@ -26,6 +26,15 @@ impl Token {
             col: -1
         }
     }
+
+    pub fn name(name: String) -> Token {
+        Token {
+            lexeme: name,
+            ttype: TokenType::Nothing,
+            line: -1,
+            col: -1
+        }
+    }
 }
 
 impl Display for Token {
@@ -46,18 +55,16 @@ pub enum TokenType {
     Semicolon,
     Pipe, DoublePipe,
     Ampersand, DoubleAmpersand,
-    PlusEqual, MinusEqual, StarEqual, SlashEqual, Modulo,
+    PlusEqual, MinusEqual, StarEqual, SlashEqual, Modulo, Dollar,
     Var, Let, Print, Identifier, Fn,
     Comma, Underscore,
     Colon, DoubleColon,
-    Typename,
-    Return,
+    Return, String,
     LSquare, RSquare,
     Dot, DoubleDot,
     If, Else, While, Match,
-    Record, Type,
+    Record, Type, Struct, Data, Typename,
     RightArrow, RightFatArrow,
-    Struct, Data,
     Nothing
 }
 

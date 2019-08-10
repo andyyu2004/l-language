@@ -30,11 +30,11 @@ impl Matchable<LObject> for Tuple {
         } else { false }
     }
 
-    fn bindings(&self, pattern: &LPattern) -> Vec<(String, LObject)> {
+    fn bindings(&mut self, pattern: &LPattern) -> Vec<(String, LObject)> {
         if let PTuple(ps) = pattern {
             self.elements.iter()
                 .zip(ps)
-                .flat_map(|(x,p)| x.borrow().bindings(p))
+                .flat_map(|(x,p)| x.borrow_mut().bindings(p))
                 .collect_vec()
 
         } else { unreachable!() }

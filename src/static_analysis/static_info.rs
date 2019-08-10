@@ -4,6 +4,7 @@
 pub enum StaticInfo {
     IVariable(bool), // is_initialised
     IFunction, // arity
+    IConstructor(i16), // arity
     ILetBinding,
     IEmpty
 }

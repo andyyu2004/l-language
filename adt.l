@@ -29,16 +29,15 @@ if let T = x { 11! } else { 10! }
     sum_list xs !
 }
 
-
-data Tree = TNil | Node (Int, Tree, Tree);
-
-fn sum_tree = tree: Tree : Number {
-    if let Node(x, l, r) = tree {
-        x + sum_tree l + sum_tree r
-    } else { 0 }
-}
-
 {
+    data Tree = TNil | Node (Int, Tree, Tree);
+
+    fn sum_tree = tree: Tree : Number {
+        if let Node(x, l, r) = tree {
+            x + sum_tree l + sum_tree r
+        } else { 0 }
+    }
+
     let t = Node (0, Node(1, TNil, TNil), Node(2, TNil, Node(36, TNil, TNil)));
     sum_tree t !
 }
@@ -48,5 +47,57 @@ fn sum_tree = tree: Tree : Number {
     let xs = Cons 3 Nil;
 
 }
+
+{
+    data List = Nil | Cons Number List;
+    let xs = Cons 5 (Cons 6 (Cons 7 Nil));
+
+    fn sum_l = xs: List : Number {
+        if let Cons x xs = xs {
+            x + sum_l xs
+        } else {
+            0
+        }
+    }
+
+    sum_l xs !
+
+    // Currying data constructor
+    data List = Nil | Cons Number List;
+    let l1 = Cons 99; // Partially applied constructor
+    let xs = l1 (l1 (l1 (l1 (l1 (l1 Nil)))));
+    "Curried"!
+    sum_l xs !
+
+
+}
+
+{
+    data Tree = Nil | Node Int Tree Tree;
+
+    let tree = Node 5 (Node 10 Nil Nil) (Node 15 Nil Nil);
+
+    fn sum_tree = t: Tree : Number {
+        if let Node x l r = t {
+            x + sum_tree l + sum_tree r
+        } else { 0 }
+    }
+
+    sum_tree tree !
+
+}
+
+{
+    data Foo = Foo Int;
+    let foo = Foo 4;
+    if let Foo x = foo { x! }
+
+}
+
+
+
+
+
+
 
 

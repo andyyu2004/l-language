@@ -63,7 +63,17 @@ impl LObject {
         else { panic!("Expected LObject to be a tuple") }
     }
 
+    pub fn tuple_mut(&mut self) -> &mut Tuple {
+        if let LTuple(tuple) = self { tuple }
+        else { panic!("Expected LObject to be a tuple") }
+    }
+
     pub fn variant(&self) -> &Variant {
+        if let LVariant(variant) = self { variant }
+        else { panic!("Expected LObject to be a variant") }
+    }
+
+    pub fn variant_mut(&mut self) -> &mut Variant {
         if let LVariant(variant) = self { variant }
         else { panic!("Expected LObject to be a variant") }
     }
@@ -73,6 +83,7 @@ impl LObject {
 impl Matchable<Self> for LObject {
     fn is_match(&self, pattern: &LPattern) -> bool {
         match pattern {
+            PConstructor(l, r) => false,
             PIdentifier(x) => true,
             PWildcard => true,
             PTuple(_) => self.tuple().is_match(pattern),
@@ -82,14 +93,15 @@ impl Matchable<Self> for LObject {
         }
     }
 
-    fn bindings(&self, pattern: &LPattern) -> Vec<(String, LObject)> {
+    fn bindings(&mut self, pattern: &LPattern) -> Vec<(String, LObject)> {
         match pattern {
+            PConstructor(_, _) => vec![],
             PIdentifier(x) => vec![(x.lexeme.clone(), self.clone())],
             PWildcard => vec![],
-            PTuple(_) => self.tuple().bindings(pattern),
+            PTuple(_) => self.tuple_mut().bindings(pattern),
             PRecord => vec![],
             PLiteral(_) => vec![],
-            PVariant(..) => self.variant().bindings(pattern)
+            PVariant(..) => self.variant_mut().bindings(pattern)
         }
     }
 }

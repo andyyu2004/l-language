@@ -5,13 +5,15 @@ use crate::parsing::{Expr, Stmt, Mode};
 use crate::errors::LError;
 use crate::types::LType;
 use crate::types::l_types::Pair;
-use crate::parsing::stmt::Stmt::{FnStmt, LetStmt, FnCurried, VarStmt, ReturnStmt, TypeAlias, WhileStmt, StructDecl, DataDecl};
+use crate::parsing::stmt::Stmt::*;
 use crate::types::l_types::LType::{TTuple, TRecord, TName, TArrow, TUnit, TList};
-use crate::parsing::expr::Expr::{EApplication, EBinary, EUnary, ELiteral, EVariable, EAssignment, EIf, EBlock, ERecord, ELogic, EGet, ESet, EDataConstructor, EMatch, EIfLet, EList};
+use crate::parsing::expr::Expr::*;
 use std::fmt::{Display};
 use std::collections::{HashMap, VecDeque};
 use crate::lexing::token::TokenType::{Plus, Minus};
 use crate::interpreting::pattern_matching::LPattern;
+use crate::interpreting::pattern_matching::LPattern::*;
+use itertools::Itertools;
 
 /*
 <expr> ::= <addition>
@@ -427,19 +429,23 @@ impl Parser {
 
     fn parse_pattern(&mut self) -> Result<LPattern, LError> {
         if self.match1(TokenType::Underscore) {
-            Ok(LPattern::PWildcard)
+            Ok(PWildcard)
         } else if self.match1(TokenType::Identifier) {
-            Ok(LPattern::PIdentifier(self.previous().clone()))
+            Ok(PIdentifier(self.previous().clone()))
         } else if self.match1(TokenType::Typename) {
-            Ok(LPattern::PVariant(self.previous().clone(), Box::new(self.parse_pattern().ok())))
+            let token = self.previous().clone();
+            let mut ps = vec![];
+            while let Ok(p) = self.parse_pattern() { ps.push(p); }
+            let acc = ps.into_iter().rev().fold1( |acc, x| PConstructor(Box::new(x), Box::new(acc)));
+            Ok(PVariant(token, acc.map(Box::new)))
         } else if self.match1(TokenType::LParen) {
-            let mut v = vec![];
-            while {
-                v.push(self.parse_pattern()?);
-                self.match1(TokenType::Comma)
-            } {}
-            self.expect(TokenType::RParen)?;
-            Ok(LPattern::PTuple(v))
+            let backtrack = self.i;
+            let pattern = self.parse_pattern();
+            if pattern.is_err() || self.expect(TokenType::RParen).is_err() {
+                self.i = backtrack;
+                return Ok(PTuple(self.parse_tuple(&Parser::parse_pattern)?))
+            }
+            pattern
         } else {
             Err(LError::from_token("Bad pattern".to_string(), self.current()))
         }
@@ -663,7 +669,7 @@ impl Parser {
             Ok(EVariable { name: self.previous().clone() })
         } else if self.match1(TokenType::Typename) {
             Ok(EDataConstructor { name: self.previous().clone() })
-        } else if self.r#match(&[TokenType::False, TokenType::True, TokenType::Number]) {
+        } else if self.r#match(&[TokenType::False, TokenType::True, TokenType::Number, TokenType::String]) {
             Ok(ELiteral(self.previous().clone()))
         } else if self.match1(TokenType::Record) {
             self.expect(TokenType::LBrace)?;

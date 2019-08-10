@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter, Error};
 use crate::parsing::expr::{format_tuple, format_record};
 use LType::{TBool,TArrow,TTuple,TUnit,TNum,TTop};
-use crate::types::l_types::LType::{TRecord, TName, TNothing, TVariant, TData, TList};
+use crate::types::l_types::LType::*;
 use crate::interpreting::Env;
 use crate::types::LTypeError;
 use crate::lexing::Token;
@@ -14,6 +14,7 @@ pub enum LType {
     TTop,
     TBool,
     TNum,
+    TString,
     TArrow(Box<LType>, Box<LType>),
     TTuple(Vec<LType>),
     TRecord(HashMap<String, LType>),
@@ -26,11 +27,37 @@ pub enum LType {
 }
 
 impl LType {
+
+    // If only one simple type, it remains
+    pub fn rightmost_type(&self) -> &Self {
+        match self {
+            TArrow(_, r) => r.rightmost_type(),
+            t => t,
+        }
+    }
+
+    // Number of arrows
+    // i.e. the number of parameters the function takes to become fully applied
+    pub fn curried_arity(&self) -> i16 {
+        match self {
+            TArrow(l, r) => 1 + r.curried_arity(),
+            t => 0
+        }
+    }
+
+    // If only one type to start with, it remains
+    pub fn remove_rightmost(self) -> Self {
+        match self {
+            TArrow(l, r) => match *r {
+                TArrow(ref ll, ref rr) => TArrow(l, Box::from(r.remove_rightmost())),
+                _ => *l
+            }
+            t => panic!("Attempting to remove rightmost type on a simple type {}", t)
+        }
+    }
+
     pub fn map_string_to_type(self, env: &Env<LType>) -> Result<LType, LTypeError> {
         match self {
-            TTop=> Ok(TTop),
-            TBool => Ok(TBool),
-            TNum => Ok(TNum),
             TList(t) => Ok(TList(Box::new(t.map_string_to_type(env)?))),
             TArrow(l, r) => Ok(TArrow(Box::new(l.map_string_to_type(env)?), Box::new(r.map_string_to_type(env)?))),
             TTuple(xs) => Ok(TTuple(xs.into_iter().map(|x| x.map_string_to_type(env)).collect::<Result<Vec<_>, _>>()?)),
@@ -46,8 +73,7 @@ impl LType {
                 Ok(t) => Ok(t),
                 Err(_) => Err(NonExistentType(name))
             },
-            TNothing => Ok(self),
-            TData(_) => Ok(self)
+            _ => Ok(self)
         }
     }
 }
@@ -59,6 +85,7 @@ impl Display for LType {
             TBool => write!(f, "Bool"),
             TNum => write!(f, "Number"),
             TUnit => write!(f, "Unit"),
+            TString => write!(f, "TString"),
             TList(x) => write!(f, "[{}]", x),
             TName(s) => write!(f, "'{}", s),
             TNothing => write!(f, "TNothing"),
@@ -93,6 +120,7 @@ impl PartialEq for LType {
         match (self, other) {
             (TTop, _) | (_, TTop) => true, // TTop can be used in place of any type
             (TBool, TBool) => true,
+            (TString, TString) => true,
             (TNum, TNum) => true,
             (TArrow(t, u), TArrow(x, y)) => t == x && u == y,
             (TUnit, TUnit) => true,

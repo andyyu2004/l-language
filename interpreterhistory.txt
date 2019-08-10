@@ -1,100 +1,100 @@
-f
-fn f() -> Int { 5 }
-f()
-fn f() -> Int { 5 }
-f()
-fn f() -> Int { 5 }
-f()
-match 5 {}
-match 5 { Nil -> {}}
-match 5 { | Nil -> {}}
-match 5 { | Nil -> {} | Fuck -> 5}
-if let S = 6 {}
-data B = F | T
-if let F = x
-if let F = x {}
-if let T = x {}
-if let F = x {}
-if let R = x {}
-if let T = x {}
-data B = F | T
-if let T = x {}
-if let F = x {}
-data List = Nil | Cons Int List
-if let Nil = x {}
-data List = Nil | Cons Int List
-if let Nil = x {}
-data List = Nil | Cons Int List
-if let Nil = x {}
-let x = No;
-let x = Nil;
-if let Nil = x {}
-if let Nil x = x {}
-if let Nil = x {}
-data List = Nil | Cons Int List
 data List = Nil | Cons Int List;
-Nil 3
+if let Cons x xs = Nil { 1! } else { 0! }
+data List = Nil | Cons Int List;
+if let Cons x xs = Nil { 1! } else { 0! }
+if let Cons x xs = Cons 3 Nil { 1! } else { 0! }
+let x = 0
+let x = 0;
+let y = 1;
+[x,y]
+data List = Nil | Cons Int List;
+:e
+data List = Nil | Cons Int List;
+Cons
+Cons 4
+Cons 4 Nil
+data List = Nil | Cons Int List;
 Nil
-Cons 1
+Cons 1 Nil
+Cons 22 Nil
 data List = Nil | Cons Int List;
-data List = Nil | Cons (Int, List);
-Cons 1
-Cons (1, Nil)
-(1,2,3)
-if let x = (1,2,3) {}
-if let x = (1,2,3) { 5}
-if let x = (1,2,3) { 5 }
-if let x = (1,2,3) { }
-if let x = (1,2,3) { false }
-if let x = (1,2,3) { false } else { true {
-if let x = (1,2,3) { false } else { true }
-if let (x,y,z) = (1,2,3) { false } else { true }
-if let _ = (1,2,3) { false } else { true }
-if let x = (1,2,3) { false } else { true }
-if let x = (1,2,3) { x } else { true }
-if let x = (1,2,3) { false } else { true }
-if let x = (1,2,3) { x } else { true }
-if let (a,b,c)  = (1,2,3) { x } else { true }
-if let (a,b,c)  = (1,_,3) { x } else { true }
-if let (a,_,c)  = (1,3,3) { x } else { true }
-if let (a,_,(c,v,f))  = (1,3,3) { x } else { true }
-if let (a,_,(c,v,f), x)  = (1,3,3) { x } else { true }
-if let (a,b,c)  = (1,3,3) { x } else { true }
-if let (a,b,x)  = (1,3,3) { x } else { true }
-if let (a,b,x) = (1,3,3) { x } else { true }
-if let (a,b,x) = (1,3,3) { x } else { 9999 }
-if let (a,b,c) = (1,2,3) { x } else { 9999 }
-if let (a,b,c) = (1,2,3) { c } else { 9999 }
-if let (a,b,c) = (1,2,3) { b } else { 9999 }
-if let (a,b,c) = (1,2,3) { a } else { 9999 }
-if let (a,b,c) = (1,2,3) { b } else { 9999 }
-if let (a,b,c) = (1,2,3) { a } else { 9999 }
-if let (a,b,c) = (1,2,3) { (a,b,c,0) } else { 9999 }
-if let (a,b,c) = (1,2,3) { a! b! c! } else { 9999 }
-if let (a,b,c) = (1,2,3) { a! b! c! 0 } else { 9999 }
-data B = T | F;
-let x = T;
-if let T = x { 1! }
-if let T = x { 1! } else { 0! }
-if let 1 = x { 1! } else { 0! }
-if let y = x { 1! } else { 0! }
-let x = T;
-data List = Nil | Cons (Number, List);
-Cons (0, Nil)
-data List = Nil | Cons (Number, List);
-Cons (0, Nil)
-data List = Nil | Cons (Number, List);
-Cons (0, Nil)
-data List = Nil | Cons (Number, List);
-Cons (0, Nil)
+Cons 22 Nil
+Nil
 data List = Nil | Cons Int List;
-data List = Nil | Cons Int Bool List;
-[1,2,3]
-let tuple: (Bool, Int) = (2,2)
-let tuple: (Bool, Int) = (2,2);
-[1,2,3]
-[1,2,3,5,6,7]
-3:[1,2,3,5,6,7]
-data List = Nil | Cons Int Bool List;
-Cons 5
-Cons 5 false
+Nil
+data List = Nil | Cons Int List;
+Cons 1 Nil
+data List = Nil | Cons Int List;
+data Test = Test 
+data Test = Test;
+Test
+data Test = Test Int Bool Int
+data Test = Test Int Bool Int;
+Test 5
+Test 5 5
+Test 5 false
+Test 5 false r
+Test 5 false 5
+data Test = Test Int Bool Int;
+Test 5 false 5
+data Test = Test Int Bool Int | Nil;
+Nil
+data Test = Test Int Bool Int | Nil;
+Test 5 false 5
+data Test = Test Int Bool Int | Nil;
+Test 5 false 5
+Nil
+data Test = Test Int Bool Int | Nil;
+Nil
+data Test = Test Int Bool Int | Nil;
+Test 5 false 5
+data List = Nil | Cons Number List;
+let xs = Cons 5 (Cons 6 Nil);
+xs
+let xs = Cons 5 (Cons 6 Nil);
+data List = Nil | Cons Number List;
+let xs = Cons 5 (Cons 6 Nil);
+Nil
+Cons
+Cons 3
+Cons 3 No;
+Cons 3 Nil
+if let Cons x xs = Cons 3 Nil {}
+data List = Nil | Cons Number List;
+if let Cons x xs = Cons 3 Nil {}
+data List = Nil | Cons Number List;
+if let Cons x xs = Cons 3 Nil {}
+data List = Nil | Cons Number List;
+if let Cons x xs = Cons 3 Nil {}
+data List = Nil | Cons Number List;
+if let Cons x xs = Cons 3 Nil {}
+data List = Nil | Cons Number List;
+if let Cons x xs = Cons 3 Nil {}
+data List = Nil | Cons Number List;
+if let Cons x xs = Cons 3 Nil {}
+data List = Nil | Cons Number List;
+if let Cons x xs = Cons 3 Nil {}
+if let Cons x xs = Cons 3 Nil { x }
+if let Cons x xs = Cons 3 Nil { x } else { -999 }
+data List = Nil | Cons Number List;
+if let Cons x xs = Cons 3 Nil { x } else { -999 }
+if let Cons x xs = Cons 3 Nil { x! xs! }
+if let Cons x xs = Cons (Cons 3 Nil) Nil { x! xs! }
+if let Cons x xs = Cons 4 (Cons 3 Nil) { x! xs! }
+[200~data List = Nil | Cons Number List;
+data List = Nil | Cons Number List;
+if let Cons x = Cons 4 6 {}
+if let Cons x xs = Cons 4 6 {}
+if let Cons x xs = Cons 4 Nil {}
+if let Cons x = Cons 4 Nil {}
+if let Cons x = Cons 4 Nil { x }
+if let Cons x = Cons 4 Nil { x } else { Cons }
+if let Cons x = Cons 4 Nil { x! } 
+data List = Nil | Cons Number List;
+if let Cons x = Cons 4 Nil { x! } 
+if let Cons x xs = Cons 4 Nil { x! } 
+let t = (1,2,3);
+if let (a, b, c) = t { a! b! c! }
+"sdf"
+"asd"
+"asd" !

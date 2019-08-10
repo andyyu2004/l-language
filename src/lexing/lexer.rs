@@ -38,6 +38,7 @@ impl Lexer {
                 ';' => tokens.push(self.create_token(TokenType::Semicolon, char::to_string(&c))),
                 '[' => tokens.push(self.create_token(TokenType::LSquare, char::to_string(&c))),
                 ']' => tokens.push(self.create_token(TokenType::RSquare, char::to_string(&c))),
+                '$' => tokens.push(self.create_token(TokenType::Dollar, char::to_string(&c))),
                 ':' => if self.match_next(':') {
                     tokens.push(self.create_token(TokenType::DoubleColon, "::".to_string()))
                 } else {
@@ -106,6 +107,20 @@ impl Lexer {
                     let token = Token::new(TokenType::Number, num, self.line, start_col);
                     tokens.push(token);
                     continue;
+                },
+                '"' => {
+                    let start_col = self.col;
+                    let mut acc = String::new();
+                    self.inc_indexes();
+                    while !self.at_end() && self.peek() != '"' {
+                        acc.push(self.peek());
+                        self.inc_indexes()
+                    }
+                    if self.peek() != '"' {
+                        errors.push(LError::new("Unterminated string literal".to_string(), self.line, start_col));
+                    } else {
+                        tokens.push(Token::new(TokenType::String, acc, self.line, start_col))
+                    }
                 },
                 c if Lexer::is_identifier_start(c) => {
                     let start_col = self.col;
@@ -195,13 +210,13 @@ impl Lexer {
         Lexer::is_identifier_start(c) || '0' <= c && c <= '9' || 'A' <= c && c <= 'Z' || c == '\''
     }
 
-//    fn next(&mut self) -> Option<char> {
-//        let x = self.safe_peek();
-//        if x.is_some() {
-//            self.inc_indexes();
-//            x
-//        } else { None }
-//    }
+    fn next(&mut self) -> Option<char> {
+        let x = self.safe_peek();
+        if x.is_some() {
+            self.inc_indexes();
+            x
+        } else { None }
+    }
 
     fn match1(&mut self, c: char) -> bool {
         if self.safe_peek().map_or(false, |x| x == c) {

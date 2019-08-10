@@ -7,49 +7,60 @@ use std::fmt::{Display, Formatter, Error};
 use crate::interpreting::pattern_matching::Matchable;
 use crate::interpreting::objects::LObject;
 use crate::interpreting::LPattern::*;
+use itertools::{join, Itertools};
+use crate::interpreting::objects::l_object::LObject::LUnit;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Variant {
     tag: String,
-    arg: Rc<RefCell<LObject>>
+    args: Vec<Rc<RefCell<LObject>>>,
+    index: usize,
 }
 
 impl Variant {
 //    pub fn from_env(tag: String)
-    pub fn new(tag: String, arg: Rc<RefCell<LObject>>) -> Variant {
+    pub fn new(tag: String, args: Vec<Rc<RefCell<LObject>>>) -> Variant {
         Variant {
-            tag, arg
+            tag, args, index: 0
         }
     }
 }
 
 impl Matchable<LObject> for Variant {
     fn is_match(&self, pattern: &LPattern) -> bool {
-        if let PVariant(x, p) = pattern {
+        if let PVariant(x, _) = pattern {
             x.lexeme == self.tag
         } else {
             false
         }
     }
 
-    fn bindings(&self, pattern: &LPattern) -> Vec<(String, LObject)> {
+    fn bindings(&mut self, pattern: &LPattern) -> Vec<(String, LObject)> {
         match pattern {
-            PVariant(_, p) => match **p {
-                // Match containing object with pattern is only used to check whether the tag matches or not
-                // The token in pvariant is only for
-                Some(ref p) => self.arg.borrow().bindings(p),
-                None => vec![],
-            }
-            _ => panic!()
+            PVariant(_, p) => {
+                if let Some(p) = p {
+                    self.bindings(p)
+                } else {
+                    vec![]
+                }
+            },
+            PConstructor(l, r) => {
+                self.index += 1;
+                let xs = self.args[self.index - 1].borrow_mut().bindings(l);
+                let rs = self.bindings(r);
+                xs.into_iter().chain(rs).collect_vec()
+            },
+            PIdentifier(id) => vec![(id.lexeme.clone(), self.args[self.index].borrow().clone())],
+            p => self.args[self.index].borrow_mut().bindings(p),
         }
     }
 }
 
 impl Display for Variant {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        match &*self.arg.borrow() {
-            LObject::LUnit => write!(f, "{}", self.tag),
-            x => write!(f, "{} {}", self.tag, x)
+        match &self.args {
+            args if args.len() == 1 && *args[0].borrow() == LUnit => write!(f, "{}", self.tag),
+            args => write!(f, "{} {}", self.tag, join(args.iter().map(|x| x.borrow()), " "))
         }
     }
 }

@@ -1,9 +1,9 @@
 use crate::parsing::{Expr, Stmt, Mode};
 use crate::lexing::{TokenType, Token};
 use crate::types::{LType, LTypeError};
-use crate::types::l_types::LType::{TBool, TNum, TArrow, TTuple, TUnit, TRecord, TData, TVariant, TTop, TNothing, TList};
+use crate::types::l_types::LType::{TBool, TNum, TArrow, TTuple, TUnit, TRecord, TData, TVariant, TTop, TNothing, TList, TString};
 use crate::types::l_types::Pair;
-use crate::parsing::expr::Expr::{EBinary, ELiteral, EVariable, ETuple, EApplication, EAssignment, EBlock, EIf, ERecord, ELogic, EGet, ESet, EDataConstructor, EMatch, EIfLet, EList};
+use crate::parsing::expr::Expr::{EBinary, ELiteral, EVariable, ETuple, EApplication, EAssignment, EBlock, EIf, ERecord, ELogic, EGet, ESet, EDataConstructor, EMatch, EIfLet, EList, EUnary};
 use crate::interpreting::Env;
 use crate::types::LTypeError::{TypeError, NonFunction, InvalidDeclaration, TypeMismatch, NonExistentField, NotGettable, NonExistentType, NonExistentDataConstructor, BadPattern};
 use crate::parsing::stmt::Stmt::{LStmt, FnStmt, VarStmt, LetStmt, FnCurried, ExprStmt, ReturnStmt, PrintStmt, TypeAlias, WhileStmt, StructDecl, DataDecl};
@@ -15,6 +15,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use crate::interpreting::pattern_matching::LPattern;
 use itertools::Itertools;
+use std::ops::Deref;
 
 pub struct TypeChecker {
     env: Rc<RefCell<Env<LType>>>, // Variable -> Type
@@ -63,6 +64,7 @@ impl TypeChecker {
         match expr {
             ELiteral(token) => TypeChecker::type_of_literal(token),
             EBinary { operator, left, right } => self.type_of_binary(operator, left, right),
+            EUnary { operator, operand } => self.type_of_unary(operator, operand),
             EVariable { name } => self.type_of_variable(name),
             EApplication { token, callee, arg} => self.type_of_curry_application(token, callee, arg),
             EAssignment { lvalue, expr } => self.type_of_assignment(lvalue, expr),
@@ -206,14 +208,41 @@ impl TypeChecker {
         Ok(tright)
     }
 
+//    if let Some(ref p) = **p {
+//    let constructor_type = if let TArrow(l, _) = self.env.borrow().resolve(name).unwrap() { *l }
+//    else { ltype.clone() };
+//    self.type_of_pattern_bindings(name, p, &constructor_type)
+//    } else { Ok(vec![]) },
+
     // Pattern and the scrutinee it is matching against
     fn type_of_pattern_bindings(&self, token: &Token, pattern: &LPattern, ltype: &LType) -> Result<Vec<(String, LType)>, LTypeError> {
         match pattern {
-            PVariant(name, p) => if let Some(ref p) = **p {
-                let constructor_type = if let TArrow(l, _) = self.env.borrow().resolve(name).unwrap() { *l }
-                else { ltype.clone() };
-                self.type_of_pattern_bindings(name, p, &constructor_type)
+            PVariant(name, p) => if let Some(p) = p {
+                let constructor_type = match self.env.borrow().resolve(name) {
+                    Ok(x) => x,
+                    Err(_) => return Err(NonExistentDataConstructor(name.clone()))
+                };
+//                println!("ctype: {}", ltype);
+//                let constructor_type =
+//                    if let TArrow(l, _) = constructor { *l }
+//                    else { ltype.clone() };
+//                println!("ctype': {}", constructor_type);
+                let adt_type = constructor_type.rightmost_type();
+                if  adt_type != ltype { return Err(TypeError(adt_type.clone(), ltype.clone(), token.clone())) }
+                // Remove the rightmost as the rightmost type is the type of the adt itself, and we don't want to match that
+                // Remove rightmost will always work without panic because if it is a simple type then there is no pattern and the if let Some will fail and skip this block
+                self.type_of_pattern_bindings(name, p, &constructor_type.remove_rightmost())
             } else { Ok(vec![]) },
+            PConstructor(pl, pr) => {
+                if let TArrow(tl, tr) = ltype {
+                    Ok(self.type_of_pattern_bindings(token, pl, tl)?
+                        .into_iter()
+                        .chain(self.type_of_pattern_bindings(token, pr, tr)?)
+                        .collect_vec())
+                } else {
+                    Err(BadPattern(pattern.clone(), ltype.clone(), token.clone()))
+                }
+            },
             PRecord => Ok(vec![]),
             PTuple(xs) => {
                 if let TTuple(ts) = ltype {
@@ -247,13 +276,6 @@ impl TypeChecker {
 //            },
 //        }
 //    }
-
-    fn rightmost_type(&self, ltype: LType) -> LType {
-        match ltype {
-            TArrow(_, r) => self.rightmost_type(*r),
-            t => t,
-        }
-    }
 
     fn type_of_variable(&mut self, name: &Token) -> Result<LType, LTypeError> {
         match self.env.borrow().resolve(name) {
@@ -308,6 +330,10 @@ impl TypeChecker {
             Ok(tlvalue)
         }
         else { Err(TypeError(tlvalue, texpr, lvalue.clone())) }
+    }
+
+    fn type_of_unary(&self, operator: &Token, operand: &Expr) -> Result<LType, LTypeError> {
+        Ok(TNum)
     }
 
     fn type_of_binary(&mut self, operator: &Token, left: &Expr, right: &Expr) -> Result<LType, LTypeError> {
@@ -378,6 +404,7 @@ impl TypeChecker {
         match x.ttype {
             TokenType::True | TokenType::False => Ok(TBool),
             TokenType::Number => Ok(TNum),
+            TokenType::String => Ok(TString),
             _ => unreachable!()
         }
     }
