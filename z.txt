@@ -1,10 +1,12 @@
-data Either = Left Bool | Right Int;
+{
+    data List = Nil | Cons Int List;
 
-let x = Left false;
-let x = Right 5;
+    fn map = f: Int -> Int => xs: List: List {
+        match xs {
+            | Cons x xs -> Cons (f x) (map f xs)
+            | Nil -> Nil
+        }     
+    }
 
-if let Left b = x {
-    b !
-} else if let Right i = x {
-    i !
+
 }

@@ -6,16 +6,11 @@ pub struct LError {
     message: String,
     line: i32,
     col: i16,
-    token: Option<Token> // Just for current debugging
 }
 
 impl Display for LError {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        match &self.token {
-            Some(t) => writeln!(f, "{}:{}: {}", self.line, self.col, self.message),
-            None => writeln!(f, "{}:{}: {}", self.line, self.col, self.message)
-        }
-
+        writeln!(f, "{}:{}: {}", self.line, self.col, self.message)
     }
 }
 
@@ -38,13 +33,12 @@ impl LError {
             message,
             line: *line,
             col: *col,
-            token: Some(token.clone())
         }
     }
 
     pub(crate) fn new(message: String, line: i32, col: i16) -> LError {
         LError {
-            line, col, message, token: None
+            line, col, message
         }
     }
 }

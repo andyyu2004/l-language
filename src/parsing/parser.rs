@@ -29,14 +29,13 @@ use itertools::Itertools;
 pub struct Parser {
     tokens: Vec<Token>,
     i: usize,
-    mode: Mode
 }
 
 // Utility
 impl Parser {
 
-    pub fn new(tokens: Vec<Token>, mode: Mode) -> Parser {
-        Parser { tokens, mode, i: 0 }
+    pub fn new(tokens: Vec<Token>, _mode: Mode) -> Parser {
+        Parser { tokens, i: 0 }
     }
 
     pub fn current(&self) -> &Token { &self.tokens[self.i] }
@@ -204,14 +203,15 @@ impl Parser {
 
     // <letBinding> ::= "let" ID = <expr> ;
     fn parse_let_binding(&mut self) -> Result<Stmt, LError> {
-        let name = self.expect(TokenType::Identifier)?.clone();
+        let token = self.previous().clone();
+        let pattern = self.parse_pattern()?;
         let ltype = if self.match1(TokenType::Colon) {
             Some(self.parse_type()?)
         } else { None };
         self.expect(TokenType::Equal)?;
         let init = self.parse_expression()?;
         self.expect(TokenType::Semicolon)?;
-        Ok(LetStmt { name, ltype, init })
+        Ok(LetStmt { token, pattern, ltype, init })
     }
 
     fn parse_fn_decl(&mut self) -> Result<Stmt, LError> {
@@ -253,15 +253,15 @@ impl Parser {
         }
     }
 
-    fn parse_typed_params(&mut self) -> Result<Vec<Pair<LType>>, LError> {
-        let mut vec = Vec::<Pair<LType>>::new();
-        while self.current().ttype != TokenType::RParen {
-            vec.push(self.parse_name_type_pair()?);
-            if !self.match1(TokenType::Comma) { break; }
-        }
-        self.expect(TokenType::RParen)?;
-        Ok(vec)
-    }
+    // fn parse_typed_params(&mut self) -> Result<Vec<Pair<LType>>, LError> {
+    //     let mut vec = Vec::<Pair<LType>>::new();
+    //     while self.current().ttype != TokenType::RParen {
+    //         vec.push(self.parse_name_type_pair()?);
+    //         if !self.match1(TokenType::Comma) { break; }
+    //     }
+    //     self.expect(TokenType::RParen)?;
+    //     Ok(vec)
+    // }
 
     fn parse_name_type_pair(&mut self) -> Result<Pair<LType>, LError> {
         let name = self.expect(TokenType::Identifier)?.lexeme.clone();
@@ -299,15 +299,6 @@ impl Parser {
         } else {
             let typename= self.expect(TokenType::Typename)?;
             Ok(TName(typename.clone()))
-//            if &typename.lexeme == "Number" || &typename.lexeme == "Int" { // Allow int as synonym for now
-//                Ok(TNum)
-//            } else if &typename.lexeme == "Bool" {
-//                Ok(TBool)
-//            } else if &typename.lexeme == "Unit" {
-//                Ok(TUnit)
-//            } else {
-//                Ok(TName(typename.clone()))
-//            }
         }
     }
 
@@ -419,6 +410,9 @@ impl Parser {
                 let body = self.parse_block_expr()?;
                 branches.push((pattern, body));
             }
+            if branches.is_empty() {
+                return Err(LError::from_token("Match expression must have at least one branch".to_string(), &token))
+            }
             self.expect(TokenType::RBrace)?;
             Ok(EMatch { token, expr: Box::new(expr), branches })
         } else {
@@ -427,6 +421,15 @@ impl Parser {
     }
 
     fn parse_pattern(&mut self) -> Result<LPattern, LError> {
+//        let mut pattern = self.parse_single_pattern()?;
+//        if self.match1(TokenType::Pipe) {
+//            pattern = POr(Box::new(pattern), self.parse_pattern().map(Box::new)?)
+//        }
+//        Ok(pattern)
+        self.parse_single_pattern()
+    }
+
+    fn parse_single_pattern(&mut self) -> Result<LPattern, LError> {
         if self.match1(TokenType::Underscore) {
             Ok(PWildcard)
         } else if self.match1(TokenType::Identifier) {
@@ -569,9 +572,8 @@ impl Parser {
     }
 
     fn parse_multiplication(&mut self) -> Result<Expr, LError> {
-//        println!("Mult");
         let mut expr = self.parse_unary();
-        while self.r#match(&[TokenType::Star, TokenType::Slash]) {
+        while self.r#match(&[TokenType::Star, TokenType::Slash, TokenType::Modulo]) {
             let operator = self.previous().clone();
             let right = self.parse_unary();
             // Unwrap the expressions
@@ -585,8 +587,7 @@ impl Parser {
 
     // <unary> ::= - <unary> | <primary>
     fn parse_unary(&mut self) -> Result<Expr, LError> {
-//        println!("Unary");
-        if self.r#match1(TokenType::Minus) {
+        if self.r#match(&[TokenType::Minus, TokenType::Bang]) {
             let operator = self.previous().clone();
             let right = self.parse_unary();
             Ok(EUnary { operator, operand: Box::new(right?) })

@@ -6,7 +6,6 @@ use crate::parsing::expr::Expr::*;
 use crate::parsing::Stmt;
 use crate::parsing::stmt::format_block;
 use std::collections::{HashMap, VecDeque};
-use crate::types::LType;
 use crate::interpreting::pattern_matching::LPattern;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -30,7 +29,8 @@ pub enum Expr {
     // Using Vec<Stmt> instead of Expr for left side as it may require manual variable insertion into env but EBlock evaluation builds empty env automatically
     EIfLet { token: Token, pattern: LPattern, scrutinee: Box<Expr>, left: Vec<Stmt>, right: Box<Expr> },
     EVariant(String, Vec<Expr>),
-    EList(Token, VecDeque<Expr>), // Efficient insertion from both ends
+    EList(Token, VecDeque<Expr>), // Deque for efficient insertion from both ends
+    EPanic
 }
 
 impl Display for Expr {
@@ -52,15 +52,16 @@ impl Display for Expr {
             EVariant(name, xs) => write!(f, "variant {}: {}", name, join(xs, " ")),
             EMatch { expr, branches,.. } => write!(f, "match {} {{{}}}", expr, format_paired_vec(branches, " | ")),
             EList(_, xs) => write!(f, "[{}]", join(xs, ", ")),
-            EIf { token, condition, left, right } => match **right {
+            EIf { condition, left, right, .. } => match **right {
                 EBlock(ref xs) if !xs.is_empty() => write!(f, "if {} then {} else {}", condition, left, right),
                 _ => write!(f, "if {} then {}", condition, left),
             },
-            EIfLet { token, pattern, scrutinee, left, right } => match **right {
-                EBlock(ref xs) if !xs.is_empty() => write!(f, "if let {} = {} then {} else {}", pattern, scrutinee, format_block(left), right),
-                _ => write!(f, "if let {} = {} then {}", pattern, scrutinee, format_block(left)),
+            EIfLet { pattern, scrutinee, left, right, .. } => match **right {
+                EBlock(ref xs) if xs.is_empty() => write!(f, "if let {} = {} then {{{}}}", pattern, scrutinee, format_block(left)),
+                _ => write!(f, "if let {} = {} then {{{}}} else {{{}}}", pattern, scrutinee, format_block(left), right)
             },
-            x => write!(f, "{:?}", x)
+            EPanic => write!(f, "EPanic"),
+            // x => write!(f, "{:?}", x)
         }
     }
 }

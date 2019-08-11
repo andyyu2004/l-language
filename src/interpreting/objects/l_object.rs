@@ -4,8 +4,8 @@ use crate::parsing::expr::{format_tuple, format_record};
 use std::collections::{HashMap, VecDeque};
 use std::cell::RefCell;
 use std::rc::Rc;
-use itertools::{Itertools, join};
-use crate::interpreting::objects::l_object::LObject::{LRecord, LVariant, LTuple, LFunction, LStruct, LList};
+use itertools::{Itertools};
+use crate::interpreting::objects::l_object::LObject::*;
 use crate::interpreting::objects::{Function, Variant, Struct, Tuple};
 use crate::interpreting::pattern_matching::Matchable;
 use crate::interpreting::{LPattern, Interpreter};
@@ -53,6 +53,11 @@ impl LObject {
         else { panic!("Expected LObject to be a boolean") }
     }
 
+    pub fn function(&self) -> &Function {
+        if let LFunction(f) = self { f }
+        else { panic!("Expected LObject to be a function") }
+    }
+
     pub fn function_mut(&mut self) -> &mut Function {
         if let LFunction(f) = self { f }
         else { panic!("Expected LObject to be a function") }
@@ -83,13 +88,14 @@ impl LObject {
 impl Matchable<Self> for LObject {
     fn is_match(&self, pattern: &LPattern) -> bool {
         match pattern {
-            PConstructor(l, r) => false,
-            PIdentifier(x) => true,
+            PConstructor(_, _) => false,
+            PIdentifier(_) => true,
             PWildcard => true,
             PTuple(_) => self.tuple().is_match(pattern),
             PRecord => false,
             PLiteral(x) => Interpreter::literal_to_l_object(x).borrow().deref() == self,
             PVariant(..) => self.variant().is_match(pattern),
+//            POr(l, r) => self.is_match(l) || self.is_match(r)
         }
     }
 
@@ -101,7 +107,8 @@ impl Matchable<Self> for LObject {
             PTuple(_) => self.tuple_mut().bindings(pattern),
             PRecord => vec![],
             PLiteral(_) => vec![],
-            PVariant(..) => self.variant_mut().bindings(pattern)
+            PVariant(..) => self.variant_mut().bindings(pattern),
+//            POr(l, r) => if self.is_match(l) { self.bindings(l) } else { self.bindings(r) }
         }
     }
 }

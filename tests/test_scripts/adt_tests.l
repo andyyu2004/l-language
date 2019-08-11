@@ -142,6 +142,72 @@
 
 }
 
+{
+    data Either = Left Bool | Right Int;
+
+    let x = Left false;
+    let x = Right 22;
+
+    if let Left b = x {
+        b !
+    } else if let Right i = x {
+        i !
+    }
+}
+
+{
+    data List = Nil | Cons Int List;
+
+    fn filter = p: Int -> Bool => xs: List : List {
+        if let Cons x xs = xs {
+            if p x {
+                Cons x (filter p xs)
+            } else {
+                filter p xs
+            }
+        } else {
+            Nil
+        }
+    }
+
+    let xs = Cons 1 (Cons 2 (Cons 3 (Cons 4 Nil)));
+
+    fn is_even(n: Int) -> Bool { n % 2 == 0 }
+
+    fn is_odd(n: Int) -> Bool { !is_even n}
+
+    "even"!
+    filter is_even xs !
+    "odd"!
+    filter is_odd xs !
+}
+
+{
+    data Maybe = Just Int | Nothing;
+
+    let x = Just 99;
+
+    if let Just i = x { i ! }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

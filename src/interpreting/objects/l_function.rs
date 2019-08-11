@@ -25,12 +25,12 @@ impl LInvocable for Function {
     fn invoke(&self, arg: Rc<RefCell<LObject>>, interpreter: &mut Interpreter) -> Result<Rc<RefCell<LObject>>, InterpreterError> {
         let env = Rc::new(RefCell::new(Env::new(Some(Rc::clone(&self.closure)))));
         match &self.declaration {
-            FnCurried { name, token, param, ret } => {
+            FnCurried { name: _, token: _, param, ret } => {
                 env.borrow_mut().define(param.name.clone(), Some(Rc::clone(&arg)));
                 Ok(Rc::new(RefCell::new(LFunction(Function::new(*ret.clone(), Rc::clone(&env))))))
             },
 
-            FnStmt { param, ret_type, body, name,.. } => {
+            FnStmt { param, ret_type: _, body, name: _, .. } => {
                 if let Some(param) = param {
                     env.borrow_mut().define(param.name.clone(), Some(arg.clone()));
                 }

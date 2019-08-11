@@ -1,6 +1,4 @@
-use crate::parsing::Stmt;
-use std::collections::HashMap;
-use crate::interpreting::{Env, LPattern};
+use crate::interpreting::{LPattern};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::fmt::{Display, Formatter, Error};
@@ -72,8 +70,4 @@ impl Display for Variant {
             args => write!(f, "({} {})", self.tag, join(args.iter().map(|x| x.borrow()), " "))
         }
     }
-}
-
-pub struct Data {
-    variants: HashMap<String, Variant>
 }

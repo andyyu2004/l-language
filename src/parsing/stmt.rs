@@ -8,6 +8,7 @@ use crate::types::l_types::Pair;
 use crate::parsing::stmt::Stmt::{ExprStmt, LStmt, VarStmt, FnStmt, LetStmt, FnCurried, ReturnStmt, PrintStmt, TypeAlias, WhileStmt, StructDecl, DataDecl};
 use std::collections::HashMap;
 use crate::parsing::expr::format_record;
+use crate::interpreting::LPattern;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
@@ -18,7 +19,7 @@ pub enum Stmt {
     TypeAlias { name: Token, ltype: LType },
     ReturnStmt { token: Token, value: Option<Expr> },
     VarStmt { name: Token, ltype: Option<LType>, init: Option<Expr> },
-    LetStmt { name: Token, ltype: Option<LType>, init: Expr },
+    LetStmt { token: Token, pattern: LPattern, ltype: Option<LType>, init: Expr },
     FnStmt { name: Option<String>, token: Token, param: Option<Pair<LType>>, ret_type: LType, body: Vec<Stmt> },
     StructDecl { name: Token, fields: HashMap<String, LType> },
     FnCurried { name: Option<String>, token: Token, param: Pair<LType>, ret: Box<Stmt> },
@@ -31,9 +32,9 @@ impl Display for Stmt {
             ExprStmt(expr) => write!(f, "ExprStmt({})", expr),
             PrintStmt(expr) => write!(f, "Print({})", expr),
             LStmt(expr) => write!(f, "LStmt({})", expr),
-            VarStmt { name, ltype, init } if init.is_some() => write!(f, "var {} <- {}", name.lexeme, init.as_ref().unwrap()),
-            VarStmt { name, ltype, .. } => write!(f, "var {}", name.lexeme),
-            LetStmt { name, ltype, init } => write!(f, "var {} <- {}", name.lexeme, init),
+            VarStmt { name, init, .. } if init.is_some() => write!(f, "var {} <- {}", name.lexeme, init.as_ref().unwrap()),
+            VarStmt { name, .. } => write!(f, "var {}", name.lexeme),
+            LetStmt { pattern, init, .. } => write!(f, "let {} <- {}", pattern, init),
             WhileStmt { condition, body, .. } => write!(f, "while {} {}", condition, format_block(body)),
 //            CurriedFn(, name, params, ret, body) => write!(f, "fn {} = {} : {} {{\n{}}}", name.lexeme, format_args(params, " => "), ret, format_block(body)),
             FnStmt { name, param, ret_type, body, .. } => match name {
@@ -51,7 +52,6 @@ impl Display for Stmt {
             TypeAlias { name, ltype } => write!(f, "type {} = {}", name, ltype),
             StructDecl { name, fields } => write!(f, "struct {} {{{}}}", name, format_record(fields, ", ")),
             DataDecl { name, variants } => write!(f, "data {} = {}", name, format_record(variants, " | ")),
-            x => write!(f, "data {:?}", x)
         }
     }
 }
@@ -63,9 +63,9 @@ pub fn format_option<T>(arg: &Option<T>) -> String where T : Display {
     }
 }
 
-pub fn format_args<T>(args: &Vec<Pair<T>>, sep: &str) -> String where T : Display {
-    join(args, sep)
-}
+// pub fn format_args<T>(args: &Vec<Pair<T>>, sep: &str) -> String where T : Display {
+//     join(args, sep)
+// }
 
 pub fn format_block(statements: &Vec<Stmt>) -> String {
     join(statements, "; \n")

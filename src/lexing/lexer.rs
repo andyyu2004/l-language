@@ -39,6 +39,7 @@ impl Lexer {
                 '[' => tokens.push(self.create_token(TokenType::LSquare, char::to_string(&c))),
                 ']' => tokens.push(self.create_token(TokenType::RSquare, char::to_string(&c))),
                 '$' => tokens.push(self.create_token(TokenType::Dollar, char::to_string(&c))),
+                '%' => tokens.push(self.create_token(TokenType::Modulo, char::to_string(&c))),
                 ':' => if self.match_next(':') {
                     tokens.push(self.create_token(TokenType::DoubleColon, "::".to_string()))
                 } else {
@@ -210,13 +211,13 @@ impl Lexer {
         Lexer::is_identifier_start(c) || '0' <= c && c <= '9' || 'A' <= c && c <= 'Z' || c == '\''
     }
 
-    fn next(&mut self) -> Option<char> {
-        let x = self.safe_peek();
-        if x.is_some() {
-            self.inc_indexes();
-            x
-        } else { None }
-    }
+    // fn next(&mut self) -> Option<char> {
+    //     let x = self.safe_peek();
+    //     if x.is_some() {
+    //         self.inc_indexes();
+    //         x
+    //     } else { None }
+    // }
 
     fn match1(&mut self, c: char) -> bool {
         if self.safe_peek().map_or(false, |x| x == c) {

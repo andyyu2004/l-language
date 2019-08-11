@@ -77,6 +77,8 @@ impl Display for TokenType {
             TokenType::Star => write!(f, "*"),
             TokenType::Caret => write!(f, "^"),
             TokenType::Slash => write!(f, "/"),
+            TokenType::RightArrow => write!(f, "->"),
+            TokenType::RightFatArrow => write!(f, "=>"),
             x => write!(f, "{:?}", x)
         }
     }

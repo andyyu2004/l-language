@@ -7,7 +7,6 @@ use crate::interpreting::LPattern;
 use std::fmt::{Display, Formatter, Error};
 use crate::parsing::expr::format_tuple;
 use itertools::Itertools;
-use crate::interpreting::objects::l_object::LObject::LTuple;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Tuple {

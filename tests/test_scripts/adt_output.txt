@@ -20,3 +20,9 @@ sum tree
 (Cons 8 (Cons 14 Nil))
 false
 5
+22
+even
+(Cons 2 (Cons 4 Nil))
+odd
+(Cons 1 (Cons 3 Nil))
+99

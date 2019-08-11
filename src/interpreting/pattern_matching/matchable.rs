@@ -1,8 +1,4 @@
-use crate::interpreting::LPattern::*;
 use crate::interpreting::LPattern;
-use crate::interpreting::objects::LObject;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 pub trait Matchable<T> {
 

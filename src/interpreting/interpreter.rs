@@ -11,7 +11,7 @@ use crate::interpreting::interpreter_error::InterpreterError::{Return};
 use std::collections::{HashMap, VecDeque};
 use std::rc::Rc;
 use std::cell::{RefCell};
-use crate::lexing::token::TokenType::{BangEqual, DoubleEqual, LessEqual, GreaterEqual, Caret, Slash, Plus, Star, Less, Minus, Greater};
+use crate::lexing::token::TokenType::{BangEqual, DoubleEqual, LessEqual, GreaterEqual, Caret, Slash, Plus, Star, Less, Minus, Greater, Modulo};
 use crate::types::l_types::LType::{TArrow};
 use crate::generation::{Generator};
 use crate::interpreting::pattern_matching::Matchable;
@@ -55,7 +55,7 @@ impl Interpreter {
             ExprStmt(expr) => { self.evaluate(&expr)?; Ok(()) },
             PrintStmt(expr) => Ok(println!("{}", self.evaluate(&expr)?.borrow())),
             VarStmt { name, init, ..} => self.var_stmt(name, init),
-            LetStmt {name, init, .. } => self.let_stmt(name, init),
+            LetStmt { pattern, init, .. } => self.let_stmt(pattern, init),
             FnStmt { name, token, param, ret_type, body} =>
                 self.execute_fn_decl(name, token, param, ret_type, body),
             FnCurried { name, token, param, ret} => self.execute_curried_fn_decl(name, token, param, *ret),
@@ -68,9 +68,9 @@ impl Interpreter {
         }
     }
 
-    fn execute_data_decl(&mut self, name: Token, variants: HashMap<String, LType>) -> Result<(), InterpreterError> {
+    fn execute_data_decl(&mut self, _name: Token, variants: HashMap<String, LType>) -> Result<(), InterpreterError> {
         for (k, v) in &variants {
-            if let TArrow(l, r) = v {
+            if let TArrow(_, _) = v {
                 // Generates some L code that is a function that returns a variant (to allow partial application)
                 let f = Generator::new(k.clone()).generate_function_from_type(v)?;
                 self.execute(f)?;
@@ -89,7 +89,7 @@ impl Interpreter {
 
     fn execute_while(&mut self, condition: Expr, body: Vec<Stmt>) -> Result<(), InterpreterError> {
         while self.evaluate(&condition)?.borrow().boolean() == true {
-            let res = self.execute_block(&body, Rc::new(RefCell::new(Env::new(Some(Rc::clone(&self.env))))))?;
+            self.execute_block(&body, Rc::new(RefCell::new(Env::new(Some(Rc::clone(&self.env))))))?;
         }
         Ok(())
     }
@@ -99,12 +99,23 @@ impl Interpreter {
         let value = if let Some(x) = expr {
             Some(self.evaluate(&x)?)
         } else { None };
+        // Every declaration starts a new scope to have proper lexical scoping. VERY IMPORTANT TO CREATE NEW ENV
         self.env = Rc::new(RefCell::new(Env::new(Some(Rc::clone(&self.env)))));
         Ok(self.env.borrow_mut().define(name.lexeme, value))
     }
 
-    fn let_stmt(&mut self, name: Token, expr: Expr) -> Result<(), InterpreterError> {
-        self.var_stmt(name, Some(expr))
+    fn let_stmt(&mut self, pattern: LPattern, expr: Expr) -> Result<(), InterpreterError> {
+        let obj = self.evaluate(&expr)?;
+        if obj.borrow().is_match(&pattern) {
+            // Create new env for scoping reasons
+            self.env = Rc::new(RefCell::new(Env::new(Some(Rc::clone(&self.env)))));
+            obj.borrow_mut().bindings(&pattern)
+                .into_iter()
+                .for_each(|(k, v)| self.env.borrow_mut().define(k, Some(self.wrap(v))));
+            Ok(())
+        } else {
+            panic!("Pattern failed to match, should be ruled out by typecheck")
+        }
     }
 
     fn execute_fn_decl(&mut self, name: Option<String>, token: Token, param: Option<Pair<LType>>, ret_type: LType, body: Vec<Stmt>) -> Result<(), InterpreterError> {
@@ -144,7 +155,7 @@ impl Interpreter {
         for stmt in statements {
             let x = self.execute(stmt);
             // Consider return when in block thats not a functional block
-                if let Err(Return(obj)) = x { // Intercept return value and handle appropriately
+            if let Err(Return(obj)) = x { // Intercept return value and handle appropriately
                 self.env = enclosing.clone();
                 return Ok(obj)
             } else if let Err(error) = x {
@@ -224,6 +235,10 @@ impl Interpreter {
                     *obj.borrow_mut().number_mut() = -*obj.borrow_mut().number_mut();
                     Ok(obj)
                 },
+                TokenType::Bang => {
+                    let b = !self.evaluate(operand)?.borrow().boolean();
+                    Ok(self.wrap(LBool(b)))
+                },
                 _ => unreachable!()
             },
             ELiteral(token) => Ok(Interpreter::literal_to_l_object(token)),
@@ -254,7 +269,7 @@ impl Interpreter {
     fn evaluate_binary(&mut self, operator: &Token, left: &Expr, right: &Expr) -> Result<Rc<RefCell<LObject>>, InterpreterError> {
         let l = self.evaluate(left)?;
         let r = self.evaluate(right)?;
-        let num_ops = vec![Star, Plus, Minus, Slash, Caret];
+        let num_ops = vec![Star, Plus, Minus, Slash, Caret, Modulo];
         let cmp_ops = vec![Greater, GreaterEqual, Less, LessEqual];
         let eq_ops = vec![DoubleEqual, BangEqual];
         if num_ops.contains(&operator.ttype) {
@@ -263,6 +278,7 @@ impl Interpreter {
                 Minus => self.wrap(LNumber(l.borrow().number() - r.borrow().number())),
                 Star => self.wrap(LNumber(l.borrow().number() * r.borrow().number())),
                 Slash => self.wrap(LNumber(l.borrow().number() / r.borrow().number())),
+                Modulo => self.wrap(LNumber(l.borrow().number() % r.borrow().number())),
                 _ => panic!()
             };
             Ok(res)
@@ -322,13 +338,13 @@ impl Interpreter {
         }
     }
 
-    fn evaluate_if(&mut self, token: &Token, condition: &Expr, left: &Expr, right: &Expr) -> Result<Rc<RefCell<LObject>>, InterpreterError> {
+    fn evaluate_if(&mut self, _token: &Token, condition: &Expr, left: &Expr, right: &Expr) -> Result<Rc<RefCell<LObject>>, InterpreterError> {
         let cond = self.evaluate(condition)?;
         if cond.borrow().boolean() { self.evaluate(left) }
         else { self.evaluate(right) }
     }
 
-    fn evaluate_if_let(&mut self, token: &Token, pattern: &LPattern, scrutinee: &Expr, left: &Vec<Stmt>, right: &Expr) -> Result<Rc<RefCell<LObject>>, InterpreterError> {
+    fn evaluate_if_let(&mut self, _token: &Token, pattern: &LPattern, scrutinee: &Expr, left: &Vec<Stmt>, right: &Expr) -> Result<Rc<RefCell<LObject>>, InterpreterError> {
         let s_obj = self.evaluate(scrutinee)?; // .borrow() as &dyn Matchable;
         let matched = s_obj.borrow().is_match(pattern);
         if matched {
@@ -369,12 +385,11 @@ impl Interpreter {
         obj
     }
 
-    fn evaluate_curried_application(&mut self, token: &Token, callee: &Expr, arg: &Expr) -> Result<Rc<RefCell<LObject>>, InterpreterError> {
+    fn evaluate_curried_application(&mut self, _token: &Token, callee: &Expr, arg: &Expr) -> Result<Rc<RefCell<LObject>>, InterpreterError> {
         let callee_obj = self.evaluate(callee)?;
         let arg_obj = self.evaluate(arg)?;
-        if let LFunction(ref f) = *Rc::clone(&callee_obj).borrow() {
-            f.invoke(arg_obj, self)
-        } else { panic!("Non function") }
+        let ret = callee_obj.borrow().function().invoke(arg_obj, self);
+        ret
     }
 
 //    fn evaluate_application(&mut self, token: &Token, callee: &Expr, args: &Vec<Expr>) -> Result<LObject, LError> {

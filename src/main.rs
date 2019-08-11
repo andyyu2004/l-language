@@ -21,13 +21,15 @@ use std::{env, fs, process};
 use crate::types::type_checker::TypeChecker;
 use crate::parsing::Mode;
 use crate::static_analysis::StaticAnalyser;
+use crate::generation::{Desugarer};
 
-fn test(x: (i32, i32)) -> i32 {
-    x.0 + x.1
-}
+//fn recurse(n: i32) {
+//    println!("depth: {}", n);
+//    recurse(n + 1)
+//}
+
 
 fn main() {
-
     let args = env::args().collect::<Vec<String>>();
     if args.len() == 2 {
         let path = &args[1];
@@ -104,7 +106,7 @@ fn main() {
 
         let mut parser = Parser::new(tokens, Mode::Interactive);
 
-        let statements = match parser.parse() {
+        let mut statements = match parser.parse() {
             Ok(x) => x,
             Err(errors) => {
                 println!("Parse Error: ");
@@ -117,6 +119,10 @@ fn main() {
 //        println!("{:#?}", statements);
 
         statements.iter().for_each(|x| println!("{}", x));
+
+        Desugarer::new().desugar(&mut statements);
+//        println!("Desugared");
+//        statements.iter().for_each(|x| println!("{}", x));
 
         if let Err(err) = analyser.analyse(&statements) {
             eprintln!("Error in static analyser");
@@ -135,22 +141,6 @@ fn main() {
             println!("Interpreter Error: ");
             errors.iter().for_each(|x| eprint!("{}", x));
         }
-
-
-        // Parse Expressions only
-
-//        let mut parser = Parser::new(tokens);
-//        let expr = match parser.parse_expression() {
-//            Ok(x) => x,
-//            Err(err) => {
-//                println!("Parse Error: {:?}", err);
-//                continue;
-//            }
-//        };
-//
-//        println!("{}", expr);
-//        println!("{}", evaluate(&expr));
-
 
     }
 
@@ -177,7 +167,7 @@ pub fn execute(input: String) {
 
     let mut parser = Parser::new(tokens, Mode::Interpreted);
 
-    let statements = match parser.parse() {
+    let mut statements = match parser.parse() {
         Ok(s) => s,
         Err(errors) => {
             println!("Parse Error: ");
@@ -185,6 +175,10 @@ pub fn execute(input: String) {
             process::exit(1);
         }
     };
+
+    Desugarer::new().desugar(&mut statements);
+//    println!("Desugared");
+//    statements.iter().for_each(|x| println!("{}", x));
 
     if let Err(err) = analyser.analyse(&statements) {
         eprintln!("Error in static analyser");

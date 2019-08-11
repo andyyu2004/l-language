@@ -7,7 +7,6 @@ use crate::types::LTypeError;
 use crate::lexing::Token;
 use crate::types::LTypeError::NonExistentType;
 use std::collections::HashMap;
-use itertools::Itertools;
 
 #[derive(Clone, Debug)]
 pub enum LType {
@@ -23,7 +22,7 @@ pub enum LType {
     TVariant(HashMap<String, LType>),
     TName(Token),
     TData(String),
-    TNothing
+    // TNothing
 }
 
 impl LType {
@@ -40,8 +39,8 @@ impl LType {
     // i.e. the number of parameters the function takes to become fully applied
     pub fn curried_arity(&self) -> i16 {
         match self {
-            TArrow(l, r) => 1 + r.curried_arity(),
-            t => 0
+            TArrow(_, r) => 1 + r.curried_arity(),
+            _ => 0
         }
     }
 
@@ -49,7 +48,7 @@ impl LType {
     pub fn remove_rightmost(self) -> Self {
         match self {
             TArrow(l, r) => match *r {
-                TArrow(ref ll, ref rr) => TArrow(l, Box::from(r.remove_rightmost())),
+                TArrow(_, _) => TArrow(l, Box::from(r.remove_rightmost())),
                 _ => *l
             }
             t => panic!("Attempting to remove rightmost type on a simple type {}", t)
@@ -88,7 +87,7 @@ impl Display for LType {
             TString => write!(f, "TString"),
             TList(x) => write!(f, "[{}]", x),
             TName(s) => write!(f, "'{}", s),
-            TNothing => write!(f, "TNothing"),
+            // TNothing => write!(f, "TNothing"),
             TRecord(xs) | TVariant(xs) => write!(f, "{{{}}}", format_record(xs, ", ")),
             TTuple(xs) =>
                 if xs.len() == 0 { write!(f, "{}", TUnit)}

@@ -12,9 +12,9 @@
 //     }}
 // }
 
-struct OperatorTypeMap {}
+// struct OperatorTypeMap {}
 
-impl OperatorTypeMap {
+// impl OperatorTypeMap {
     // Symbol operators are not curried currently
 //    pub fn map() -> HashMap<TokenType, LType> {
 //        let binary_numeric_type = TArrow(Box::new(TTuple(vec![TNum, TNum])), Box::new(TNum));
@@ -28,5 +28,5 @@ impl OperatorTypeMap {
 //            TokenType::Plus => binary_numeric_type
 //        ]
 //    }
-}
+// }
 

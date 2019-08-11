@@ -6,7 +6,7 @@ pub mod l_variant;
 pub mod l_tuple;
 
 pub use self::l_struct::Struct;
-pub use self::l_variant::{Variant, Data};
+pub use self::l_variant::{Variant};
 pub use self::l_object::LObject;
 pub use self::l_invocable::LInvocable;
 pub use self::l_function::Function;

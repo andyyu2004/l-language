@@ -1,13 +1,13 @@
 use crate::parsing::{Expr, Stmt, Mode};
 use crate::lexing::{TokenType, Token};
 use crate::types::{LType, LTypeError};
-use crate::types::l_types::LType::{TBool, TNum, TArrow, TTuple, TUnit, TRecord, TData, TVariant, TTop, TNothing, TList, TString};
+use crate::types::l_types::LType::*;
 use crate::types::l_types::Pair;
-use crate::parsing::expr::Expr::{EBinary, ELiteral, EVariable, ETuple, EApplication, EAssignment, EBlock, EIf, ERecord, ELogic, EGet, ESet, EDataConstructor, EMatch, EIfLet, EList, EUnary};
+use crate::parsing::expr::Expr::*;
 use crate::interpreting::Env;
-use crate::types::LTypeError::{TypeError, NonFunction, InvalidDeclaration, TypeMismatch, NonExistentField, NotGettable, NonExistentType, NonExistentDataConstructor, BadPattern};
-use crate::parsing::stmt::Stmt::{LStmt, FnStmt, VarStmt, LetStmt, FnCurried, ExprStmt, ReturnStmt, PrintStmt, TypeAlias, WhileStmt, StructDecl, DataDecl};
-use crate::lexing::token::TokenType::{Greater, GreaterEqual, Caret, Slash, Plus, Star, LessEqual, Less, Minus, BangEqual, DoubleEqual};
+use crate::types::LTypeError::*;
+use crate::parsing::stmt::Stmt::*;
+use crate::lexing::token::TokenType::{Greater, GreaterEqual, Caret, Slash, Plus, Star, LessEqual, Less, Minus, BangEqual, DoubleEqual, Modulo};
 use crate::interpreting::LPattern::*;
 use std::mem::{discriminant};
 use std::collections::{HashMap, VecDeque};
@@ -15,7 +15,6 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use crate::interpreting::pattern_matching::LPattern;
 use itertools::Itertools;
-use std::ops::Deref;
 
 pub struct TypeChecker {
     env: Rc<RefCell<Env<LType>>>, // Variable -> Type
@@ -81,10 +80,11 @@ impl TypeChecker {
             ELogic { operator, left, right} => self.type_of_logical(operator, left, right),
             EGet { name, expr } => self.type_of_get(name, expr),
             ESet { name, expr, value } => self.type_of_set(name, expr, value),
-            EDataConstructor { name } => self.env.borrow().resolve(name).map_err(|e| NonExistentDataConstructor(name.clone())),
-            EMatch { token, expr, branches} => self.type_of_match(token, expr, branches),
+            EDataConstructor { name } => self.env.borrow().resolve(name).map_err(|_| NonExistentDataConstructor(name.clone())),
+            EMatch { .. } => panic!("Match should be desugared"), // self.type_of_match(token, expr, branches),
             EIfLet { token, pattern, scrutinee, left, right } =>
                 self.type_of_if_let(token, pattern, scrutinee, left, right),
+            EPanic => Ok(TTop), // Can represent any type
             x => unimplemented!("Unsupported: {}", x)
         }
     }
@@ -95,7 +95,7 @@ impl TypeChecker {
             FnStmt { name, token, param, ret_type, body } => self.type_of_fn(name, token, param, ret_type, body),
             FnCurried { name, param, ret, .. } => self.type_of_curried_fn(name, param, ret),
             VarStmt { name, ltype, init}  => self.type_of_var_decl(name, ltype, init.as_ref()),
-            LetStmt { name, ltype, init} => self.type_of_var_decl(name, ltype, Some(init)),
+            LetStmt { pattern, ltype, init, token} => self.type_of_let_binding(token, pattern, ltype, init),
             ReturnStmt { token, value } => self.type_of_return(token, value),
             TypeAlias { name, ltype } => self.define_type_alias(name, ltype),
             WhileStmt { token, condition, body} => self.type_of_while(token, condition, body),
@@ -103,17 +103,6 @@ impl TypeChecker {
             DataDecl { name, variants} => self.type_of_data_decl(name, variants),
             _ => panic!("Unimplented in type_check_stmt")
         }
-    }
-
-    fn type_of_match(&mut self, token: &Token, expr: &Expr, branches: &Vec<(LPattern, Expr)>) -> Result<LType, LTypeError> {
-        let first_type = self.type_of_expr(&branches[0].1)?;
-        for (_, t) in branches {
-            if self.type_of_expr(t)? != first_type {
-                return Err(TypeMismatch(first_type, self.type_of_expr(t)?, token.clone()));
-            }
-        }
-//        if !branches.iter().all(|(_, t)| self.type_of_expr(t) == first_type)
-        Ok(first_type)
     }
 
     fn type_of_data_decl(&mut self, name: &Token, variants: &HashMap<String, LType>) -> Result<LType, LTypeError> {
@@ -139,7 +128,7 @@ impl TypeChecker {
         Ok(ltype)
     }
 
-    fn type_of_struct(&mut self, name: &Token, fields: &HashMap<String, LType>) -> Result<LType, LTypeError> {
+    fn type_of_struct(&mut self, _name: &Token, _fields: &HashMap<String, LType>) -> Result<LType, LTypeError> {
 //        self.env.borrow_mut().define(name.lexeme.clone(), ),
         Ok(TUnit)
     }
@@ -148,7 +137,7 @@ impl TypeChecker {
         let t_expr = self.type_of_get(name, expr)?;
         let t_value = self.type_of_expr(value)?;
         if t_expr != t_value {
-            return Err(TypeError(t_expr, t_value, name.clone()))
+            return Err(TypeError(t_expr, t_value, name.clone(), "Type of field must match the the type of value being assigned to it".to_string()))
         }
         Ok(t_expr)
     }
@@ -157,9 +146,9 @@ impl TypeChecker {
         let ltype = self.type_of_expr(left)?;
         let rtype = self.type_of_expr(right)?;
         if ltype != TBool {
-            Err(TypeError(TBool, ltype, token.clone()))
+            Err(TypeError(TBool, ltype.clone(), token.clone(), format!("Logical operators must be assigned applied to booleans. (Left side is of type {})", ltype)))
         } else if rtype != TBool {
-            Err(TypeError(TBool, rtype, token.clone()))
+            Err(TypeError(TBool, rtype.clone(), token.clone(), format!("Logical operators must be assigned applied to booleans. (Right side is of type {})", rtype)))
         } else {
             Ok(TBool)
         }
@@ -170,7 +159,7 @@ impl TypeChecker {
         for x in xs {
             let t = self.type_of_expr(x)?;
             if t != tfirst {
-                return Err(TypeMismatch(tfirst, t, token.clone()))
+                return Err(TypeMismatch(tfirst, t, token.clone(), "Lists must be of homogeneous type".into()))
             }
         }
         Ok(TList(Box::new(tfirst)))
@@ -190,13 +179,42 @@ impl TypeChecker {
         let tleft = self.type_of_expr(left)?;
         let tright = self.type_of_expr(right)?;
         if tcond != TBool {
-            Err(TypeError(TBool, tcond, token.clone()))
+            Err(TypeError(TBool, tcond.clone(), token.clone(), format!("The condition of an if statement must be of type Bool (found type {})", tcond)))
         } else if tleft != tright {
-            Err(TypeMismatch(tleft, tright, token.clone()))
+            Err(TypeMismatch(tleft, tright, token.clone(), "If and else branches must have same return type".into()))
         } else {
             Ok(tleft)
         }
     }
+
+    fn type_of_let_binding(&mut self, token: &Token, pattern: &LPattern, ltype: &Option<LType>, init: &Expr) -> Result<LType, LTypeError> {
+        let tright = self.type_of_expr(init)?;
+        if let Some(ltype) = ltype {
+            let t_annotation = ltype.clone().map_string_to_type(&self.types)?;
+            // Check annotated type is the type on the right
+            if tright != t_annotation {
+                return Err(TypeError(t_annotation.clone(), tright.clone(), token.clone(),
+                    format!("The type of the value being assigned does not match the annotation, (Annotated {}, found {}", t_annotation, tright))
+                )
+            }
+        }
+
+        self.type_of_pattern_bindings(token, pattern, &tright)?
+            .into_iter()
+            .for_each(|(k, v)| self.env.borrow_mut().define(k, v));
+
+        Ok(tright)
+    }
+//
+//    fn type_of_match(&mut self, token: &Token, expr: &Expr, branches: &Vec<(LPattern, Expr)>) -> Result<LType, LTypeError> {
+//        let first_type = self.type_of_expr(&branches[0].1)?;
+//        for (_, t) in branches {
+//            if self.type_of_expr(t)? != first_type {
+//                return Err(TypeMismatch(first_type, self.type_of_expr(t)?, token.clone(), "All match arms must have the same return type".into()));
+//            }
+//        }
+//        Ok(first_type)
+//    }
 
     fn type_of_if_let(&mut self, token: &Token, pattern: &LPattern, scrutinee: &Expr, left: &Vec<Stmt>, right: &Expr) -> Result<LType, LTypeError> {
 //        let ptype = self.type_of_pattern(pattern)?;
@@ -209,7 +227,7 @@ impl TypeChecker {
         for (k, v) in bindings { env.define(k, v); }
         let tleft = self.type_of_block(left, Rc::new(RefCell::new(env)))?;
         let tright = self.type_of_expr(right)?;
-        if tleft != tright { return Err(TypeMismatch(tleft, tright, token.clone())) }
+        if tleft != tright { return Err(TypeMismatch(tleft, tright, token.clone(), "All branches must have the same return type".into())) }
         Ok(tright)
     }
 
@@ -233,7 +251,11 @@ impl TypeChecker {
 //                    else { ltype.clone() };
 //                println!("ctype': {}", constructor_type);
                 let adt_type = constructor_type.rightmost_type();
-                if  adt_type != ltype { return Err(TypeError(adt_type.clone(), ltype.clone(), token.clone())) }
+                if  adt_type != ltype {
+                    return Err(TypeError(adt_type.clone(), ltype.clone(), token.clone(),
+                         format!("The constructor {} belongs to data type {}. Attempting to pattern match this constructor against {}", name, adt_type, ltype))
+                    )
+                }
                 // Remove the rightmost as the rightmost type is the type of the adt itself, and we don't want to match that
                 // Remove rightmost will always work without panic because if it is a simple type then there is no pattern and the if let Some will fail and skip this block
                 self.type_of_pattern_bindings(name, p, &constructor_type.remove_rightmost())
@@ -245,12 +267,15 @@ impl TypeChecker {
                         .chain(self.type_of_pattern_bindings(token, pr, tr)?)
                         .collect_vec())
                 } else {
-                    Err(BadPattern(pattern.clone(), ltype.clone(), token.clone()))
+                    Err(BadPattern(pattern.clone(), ltype.clone(), token.clone(), format!("")))
                 }
             },
             PRecord => Ok(vec![]),
             PTuple(xs) => {
                 if let TTuple(ts) = ltype {
+                    if xs.len() != ts.len() {
+                        return Err(BadPattern(pattern.clone(), ltype.clone(), token.clone(), format!("Pattern matches a {}-tuple, got {}-tuple", xs.len(), ts.len())))
+                    }
                     Ok(xs.iter()
                         .zip(ts)
                         .flat_map(|(p, x)| self.type_of_pattern_bindings(token, p, x))
@@ -258,12 +283,12 @@ impl TypeChecker {
                         .collect_vec()
                     )
                 } else {
-                    Err(BadPattern(pattern.clone(), ltype.clone(), token.clone()))
+                    Err(BadPattern(pattern.clone(), ltype.clone(), token.clone(), format!("Note: Cannot match tuple pattern against non-tuple")))
                 }
             },
-            PLiteral(x) => Ok(vec![]),
+            PLiteral(_) => Ok(vec![]),
             PIdentifier(x) => Ok(vec![(x.lexeme.clone(), ltype.clone())]),
-            PWildcard => Ok(vec![])
+            PWildcard => Ok(vec![]),
         }
     }
 
@@ -317,7 +342,9 @@ impl TypeChecker {
         let tcallee = self.type_of_expr(callee)?;
         let targ = self.type_of_expr(arg)?;
         if let TArrow(tparam, tret) = tcallee {
-            if targ != *tparam { Err(TypeError(*tparam, targ, token.clone())) }
+            if targ != *tparam {
+                Err(TypeError(*tparam.clone(), targ.clone(), token.clone(), format!("Expected argument type of {}, found type {}", tparam, targ)))
+            }
             else { Ok(*tret) }
         } else {
             Err(NonFunction(tcallee, token.clone()))
@@ -334,30 +361,50 @@ impl TypeChecker {
             }
             Ok(tlvalue)
         }
-        else { Err(TypeError(tlvalue, texpr, lvalue.clone())) }
+        else {
+            Err(TypeError(tlvalue.clone(), texpr.clone(), lvalue.clone(),
+                  format!("Note: The variable type must match the type of the value being assigned to it. Variable is of type {}, value of type {}", tlvalue, texpr)))
+        }
     }
 
-    fn type_of_unary(&self, operator: &Token, operand: &Expr) -> Result<LType, LTypeError> {
-        Ok(TNum)
+    fn type_of_unary(&mut self, operator: &Token, operand: &Expr) -> Result<LType, LTypeError> {
+        let t_operand = self.type_of_expr(operand)?;
+        match operator.ttype {
+            TokenType::Bang => if t_operand != TBool {
+                Err(TypeError(TBool, t_operand.clone(), operator.clone(), format!("Note: The logical negation operator must be applied to type Bool, found type {}", t_operand)))
+            } else { Ok(TBool) },
+            TokenType::Minus => if t_operand != TNum {
+                Err(TypeError(TNum, t_operand.clone(), operator.clone(), format!("The numerical negation operator must be applied to type Number, found type {}", t_operand)))
+            } else { Ok(TNum) },
+            _ => panic!("Invalid unary operator")
+        }
     }
 
     fn type_of_binary(&mut self, operator: &Token, left: &Expr, right: &Expr) -> Result<LType, LTypeError> {
         // Only numbers are comparable currently
-        let num_ops = vec![Star, Plus, Minus, Slash, Caret];
+        let num_ops = vec![Star, Plus, Minus, Slash, Caret, Modulo];
         let cmp_ops = vec![Greater, GreaterEqual, Less, LessEqual];
         let eq_ops = vec![DoubleEqual, BangEqual];
         let tleft = self.type_of_expr(left)?;
         let tright = self.type_of_expr(right)?;
         if num_ops.contains(&operator.ttype) {
-            if tleft != TNum { Err(TypeError(TNum, tleft, operator.clone())) }
-            else if tright != TNum { Err(TypeError(TNum, tright, operator.clone())) }
+            if tleft != TNum { Err(TypeError(TNum, tleft.clone(), operator.clone(),
+                format!("The operation {} is of type Number -> Number -> Number, but the left argument is of type {}", operator.ttype, tleft))
+            )}
+            else if tright != TNum { Err(TypeError(TNum, tleft, operator.clone(),
+                format!("The operation {} is of type Number -> Number -> Number, but the right argument is of type {}", operator.ttype, tright))
+            )}
             else { Ok(TNum) }
         } else if eq_ops.contains(&operator.ttype) {
-            if tleft != tright { return Err(TypeMismatch(tleft, tright, operator.clone())) }
+            if tleft != tright { return Err(TypeMismatch(tleft, tright, operator.clone(), format!("Cannot compare different types for equality"))) }
             else { Ok(TBool) }
         } else if cmp_ops.contains(&operator.ttype) {
-            if tleft != TNum { Err(TypeError(TNum, tleft, operator.clone())) }
-            else if tright != TNum { Err(TypeError(TNum, tright, operator.clone())) }
+            if tleft != TNum { Err(TypeError(TNum, tleft.clone(), operator.clone(),
+                format!("The operation {} is of type Number -> Number -> Bool, but the left argument is of type {}", operator.ttype, tleft))
+            )}
+            else if tright != TNum { Err(TypeError(TNum, tleft, operator.clone(),
+                format!("The operation {} is of type Number -> Number -> Bool, but the right argument is of type {}", operator.ttype, tright))
+            )}
             else { Ok(TBool) }
         } else {
             panic!("Unknown binary op type")
@@ -417,7 +464,7 @@ impl TypeChecker {
     fn type_of_while(&mut self, token: &Token, condition: &Expr, body: &Vec<Stmt>) -> Result<LType, LTypeError> {
         let tcond = self.type_of_expr(condition)?;
         if tcond != TBool {
-            return Err(TypeError(TBool, tcond, token.clone()))
+            return Err(TypeError(TBool, tcond.clone(), token.clone(), format!("The condition on a while loop must be of type Bool, found type {}", tcond)))
         }
         self.type_of_block_e(body)?;
         Ok(TUnit)
@@ -437,7 +484,9 @@ impl TypeChecker {
 
         match &self.curr_fn_ret_type {
             Some(t) => if &tret != t {
-                Err(TypeError(t.clone(), tret, token.clone()))
+                Err(TypeError(t.clone(), tret.clone(), token.clone(),
+                      format!("The return type must match the return type in the function definition. The function is annotated {} but got {}", t, tret))
+                )
             } else { Ok(tret) },
             None => { Ok(TUnit)}
         }
@@ -448,7 +497,11 @@ impl TypeChecker {
             Some(expr) => {
                 let t_init = self.type_of_expr(expr)?;
                 if let Some(ltype) = ltype {
-                    if ltype.clone().map_string_to_type(&self.types)? != t_init { return Err(TypeError(ltype.clone(), t_init, token.clone())) }
+                    if ltype.clone().map_string_to_type(&self.types)? != t_init {
+                        return Err(TypeError(ltype.clone(), t_init.clone(), token.clone(),
+                             format!("The type of the variable annotation must match the type of the initializer. Variable is annotated to be of type {}, but found type {}", ltype, t_init))
+                        )
+                    }
                 }
                 self.env.borrow_mut().define(token.lexeme.clone(), t_init.clone());
                 Ok(t_init)
@@ -482,7 +535,7 @@ impl TypeChecker {
         let ftype = TArrow(Box::new(ptype.clone()), Box::new(ret.clone()));
 
         let enclosing = Rc::clone(&self.env);
-        let env = Env::new(Some(Rc::clone(&self.env)));
+        // let env = Env::new(Some(Rc::clone(&self.env)));
 
         if let Some(fname) = &self.curr_fname {
             // Takes the accumulated type and adds the parameter here and the return type to form the full type for a curried function
@@ -503,7 +556,7 @@ impl TypeChecker {
         let has_explicit_ret = body.iter().any(|x| self.match_discriminant(x, &dummy_ret));
         let block_type = self.type_of_block_e(body)?;
         if block_type != ret && !has_explicit_ret {
-            return Err(TypeError(ret.clone(), block_type, token.clone()));
+            return Err(TypeError(ret.clone(), block_type.clone(), token.clone(), format!("Function is annotated to have return type {}, but found {}", ret, block_type)));
         }
 
         self.env = enclosing;

@@ -15,7 +15,8 @@ use std::cell::RefCell;
 use crate::interpreting::pattern_matching::LPattern::*;
 
 enum FunctionEnv {
-    None, Function
+//    None,
+    Function
 }
 
 // Check validity of code
@@ -49,7 +50,7 @@ impl StaticAnalyser {
         match stmt {
             LStmt(expr) | ExprStmt(expr) | PrintStmt(expr) => self.analyse_expr(expr),
             VarStmt { name , init, .. } => self.analyse_var_decl(name, init),
-            LetStmt{ name , init, ..} => self.analyse_let_binding(name, init),
+            LetStmt{ token, pattern , init, ..} => self.analyse_let_binding(token, pattern, init),
             FnStmt { name, param, body, ..} => self.analyse_fn_decl(name, param, body),
             FnCurried{ name, param, ret, ..} => self.analyse_curried_fn_decl(name, param, ret),
             ReturnStmt { token, value } => self.analyse_return_stmt(token, value),
@@ -64,14 +65,14 @@ impl StaticAnalyser {
         }
     }
 
-    fn analyse_data_decl(&self, name: &Token, variants: &HashMap<String, LType>) -> Result<StaticInfo, LError> {
+    fn analyse_data_decl(&self, _name: &Token, variants: &HashMap<String, LType>) -> Result<StaticInfo, LError> {
         for (k, v) in variants {
             self.env.borrow_mut().define(k.clone(), IConstructor(v.curried_arity()));
         }
         Ok(IEmpty)
     }
 
-    fn analyse_struct(&self, name: &Token, fields: &HashMap<String, LType>) -> Result<StaticInfo, LError> {
+    fn analyse_struct(&self, _name: &Token, _fields: &HashMap<String, LType>) -> Result<StaticInfo, LError> {
         Ok(IEmpty)
     }
 
@@ -90,7 +91,7 @@ impl StaticAnalyser {
             EGet { name, expr } => self.analyse_get_expr(name, expr),
             ESet { name, expr, value} => self.analyse_set_expr(name, expr, value),
             EList(_, xs) => { for x in xs { self.analyse_expr(x)?; } ; Ok(IEmpty) },
-            EMatch { token, expr, branches} => self.analyse_match(token, expr, branches),
+            EMatch { .. } => panic!("match should be desugared"), //self.analyse_match(token, expr, branches),
             ELogic { operator, left, right} | EBinary { operator, left, right } =>
                 self.analyse_binary(operator, left, right),
             _ => Ok(IEmpty)
@@ -109,25 +110,40 @@ impl StaticAnalyser {
         self.analyse_expr(callee)
     }
 
-    fn analyse_match(&mut self, token: &Token, expr: &Expr, branches: &Vec<(LPattern, Expr)>) -> Result<StaticInfo, LError> {
-        if branches.is_empty() {
-            return Err(LError::from_token("Empty match statement".to_string(), token))
-        }
-        self.analyse_expr(expr)?;
-        let enclosing = Rc::clone(&self.env);
-        self.env = Rc::new(RefCell::new(Env::new(Some(Rc::clone(&self.env)))));
-        branches.iter().map(|(_, x)| self.analyse_expr(x)).collect::<Result<Vec<_>, LError>>()?;
-        self.env = enclosing;
-        Ok(IEmpty)
-    }
+//    fn analyse_match(&mut self, token: &Token, expr: &Expr, branches: &Vec<(LPattern, Expr)>) -> Result<StaticInfo, LError> {
+//        if branches.is_empty() {
+//            return Err(LError::from_token("Empty match statement".to_string(), token))
+//        }
+//        self.analyse_expr(expr)?;
+//        let enclosing = Rc::clone(&self.env);
+//        self.env = Rc::new(RefCell::new(Env::new(Some(Rc::clone(&self.env)))));
+//        branches.iter().map(|(_, x)| self.analyse_expr(x)).collect::<Result<Vec<_>, LError>>()?;
+//        self.env = enclosing;
+//        Ok(IEmpty)
+//    }
 
-    fn analyse_if_let(&mut self, token: &Token, pattern: &LPattern, scrutinee: &Expr, left: &Vec<Stmt>, right: &Expr) -> Result<StaticInfo, LError> {
+    fn analyse_if_let(&mut self, _token: &Token, pattern: &LPattern, scrutinee: &Expr, left: &Vec<Stmt>, right: &Expr) -> Result<StaticInfo, LError> {
+        if !pattern.is_refutable() {
+//            return Err(LError::from_token(format!("Cannot")))
+        }
         self.analyse_expr(scrutinee)?;
         let bindings = self.get_pattern_bindings(pattern)?;
         let mut env = Env::new(Some(Rc::clone(&self.env)));
         for (k, v) in bindings { env.define(k,  v); }
         self.analyse_block(left, Rc::new(RefCell::new(env)))?;
         self.analyse_expr(right)
+    }
+
+    fn analyse_let_binding(&mut self, token: &Token, pattern: &LPattern, init: &Expr) -> Result<StaticInfo, LError> {
+        if pattern.is_refutable() {
+            return Err(LError::from_token("Cannot bind to a refutable pattern".to_string(), token))
+        }
+        self.analyse_expr(init)?;
+        let bindings = self.get_pattern_bindings(pattern)?;
+        for (k, v) in bindings {
+            self.env.borrow_mut().define(k, v);
+        }
+        Ok(IEmpty)
     }
 
     // Returns the bindings that would occur if a pattern is matched to allow checking for variables
@@ -143,8 +159,8 @@ impl StaticAnalyser {
                 .flat_map(|x| self.get_pattern_bindings(x))
                 .flatten()
                 .collect_vec()),
-            PLiteral(x) => Ok(vec![]),
-            PIdentifier(x) => Ok(vec![(x.lexeme.clone(), IEmpty)]),
+            PLiteral(_) => Ok(vec![]),
+            PIdentifier(x) => Ok(vec![(x.lexeme.clone(), ILetBinding)]), // Pattern bindings are immutable
             PWildcard => Ok(vec![])
         }
     }
@@ -162,19 +178,19 @@ impl StaticAnalyser {
         }
     }
 
-    fn analyse_record(&mut self, token: &Token, xs: &HashMap<String, Expr>) -> Result<StaticInfo, LError> {
+    fn analyse_record(&mut self, _token: &Token, xs: &HashMap<String, Expr>) -> Result<StaticInfo, LError> {
         for x in xs.values() {
             self.analyse_expr(&x)?;
         }
         Ok(IEmpty)
     }
 
-    fn analyse_get_expr(&mut self, name: &Token, expr: &Expr) -> Result<StaticInfo, LError> {
+    fn analyse_get_expr(&mut self, _name: &Token, expr: &Expr) -> Result<StaticInfo, LError> {
         // Expr must be gettable, not sure how to define that yet
         self.analyse_expr(expr)
     }
 
-    fn analyse_set_expr(&mut self, name: &Token, expr: &Expr, value: &Expr) -> Result<StaticInfo, LError> {
+    fn analyse_set_expr(&mut self, _name: &Token, expr: &Expr, value: &Expr) -> Result<StaticInfo, LError> {
         self.analyse_expr(expr)?;
         self.analyse_expr(value)
     }
@@ -209,12 +225,6 @@ impl StaticAnalyser {
 //            return Err(LError::from_token(format!("Variable '{}' already in scope", name.lexeme), name))
 //        }
         self.env.borrow_mut().define(name.lexeme.clone(), IVariable(init.is_some()));
-        Ok(IEmpty)
-    }
-
-    fn analyse_let_binding(&mut self, name: &Token, init: &Expr) -> Result<StaticInfo, LError> {
-        self.analyse_expr(init)?;
-        self.env.borrow_mut().define(name.lexeme.clone(), ILetBinding);
         Ok(IEmpty)
     }
 
@@ -261,7 +271,7 @@ impl StaticAnalyser {
         Ok(info)
     }
 
-    fn analyse_binary(&mut self, token: &Token, left: &Expr, right: &Expr) -> Result<StaticInfo, LError> {
+    fn analyse_binary(&mut self, _token: &Token, left: &Expr, right: &Expr) -> Result<StaticInfo, LError> {
         self.analyse_expr(left)?;
         self.analyse_expr(right)
     }
