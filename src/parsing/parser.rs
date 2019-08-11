@@ -217,15 +217,14 @@ impl Parser {
     fn parse_fn_decl(&mut self) -> Result<Stmt, LError> {
         let token = self.expect(TokenType::Identifier)?.clone();
         // Some holes in the previous design of functional definitions
-        // Only allow parameterless functions declared in shorthand now
+        // Only allow parameterless or single parameter functions to be declared in shorthand way
         if self.match1(TokenType::LParen) {
-            let params = self.parse_typed_params()?;
-            if !params.is_empty() { return Err(LError::from_token("Function shorthand only allowed for parameterless definitions".to_string(), &token)) }
-            let mut ret_type = LType::TUnit;
-            if self.match1(TokenType::RightArrow) { ret_type = self.parse_type()?; }
+            let param = self.parse_name_type_pair().ok();
+            self.expect(TokenType::RParen)?;
+            let ret_type = if self.match1(TokenType::RightArrow) { self.parse_type()? } else { TUnit };
             self.expect(TokenType::LBrace)?;
             let body = self.parse_block()?;
-            Ok(FnStmt{ name: Some(token.lexeme.clone()), token, params, ret_type, body })
+            Ok(FnStmt{ name: Some(token.lexeme.clone()), token, param, ret_type, body })
         } else if self.match1(TokenType::Equal) {
             self.parse_curried_fn_decl(Some(token.lexeme))
         } else {
@@ -245,10 +244,10 @@ impl Parser {
             let ret_type = self.parse_type()?;
             self.expect(TokenType::LBrace)?;
             let body = self.parse_block()?;
-            Ok(FnStmt { name, token, params: vec![param], ret_type, body })
+            Ok(FnStmt { name, token, param: Some(param), ret_type, body })
         } else if self.match1(TokenType::LBrace) {
             let body = self.parse_block()?;
-            Ok(FnStmt { name, token, params: vec![param],  ret_type: TUnit, body })
+            Ok(FnStmt { name, token, param: Some(param),  ret_type: TUnit, body })
         } else {
             Err(LError::from_token("Invalid curried function syntax".to_string(), &token))
         }

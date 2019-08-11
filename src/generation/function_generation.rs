@@ -10,26 +10,26 @@ use crate::types::l_types::Pair;
 use crate::parsing::expr::Expr::{EVariant};
 use itertools::Itertools;
 
-pub fn generate_function_from_type(ltype: &LType, ret: Expr) -> Result<Stmt, InterpreterError> {
-    if let TArrow(left, right) = ltype {
-        match **right {
-            TArrow(_, _) => Ok(FnCurried {
-                    name: None,
-                    token: Token::dummy(),
-                    param: Pair::new("x".to_string(), *left.clone()),
-                    ret: Box::new(generate_function_from_type(right, ret)?)
-            }),
-            ref x => Ok(FnStmt {
-                name: None,
-                token: Token::dummy(),
-                params: vec![Pair::new("y".to_string(), *left.clone())],
-                ret_type: x.clone(),
-                body: vec![LStmt(ret)]
-            })
-        }
-    } else { Ok(LStmt(ret)) }
-
-}
+//pub fn generate_function_from_type(ltype: &LType, ret: Expr) -> Result<Stmt, InterpreterError> {
+//    if let TArrow(left, right) = ltype {
+//        match **right {
+//            TArrow(_, _) => Ok(FnCurried {
+//                    name: None,
+//                    token: Token::dummy(),
+//                    param: Pair::new("x".to_string(), *left.clone()),
+//                    ret: Box::new(generate_function_from_type(right, ret)?)
+//            }),
+//            ref x => Ok(FnStmt {
+//                name: None,
+//                token: Token::dummy(),
+//                params: vec![Pair::new("y".to_string(), *left.clone())],
+//                ret_type: x.clone(),
+//                body: vec![LStmt(ret)]
+//            })
+//        }
+//    } else { Ok(LStmt(ret)) }
+//
+//}
 
 pub struct Generator {
     vars: Vec<String>,
@@ -68,7 +68,7 @@ impl Generator {
                 ref x => Ok(FnStmt {
                     name: if self.is_first_iter { Some(self.fn_name.clone()) } else { None },
                     token: Token::dummy(),
-                    params: vec![Pair::new(self.get_var(), *left.clone())],
+                    param: Some(Pair::new(self.get_var(), *left.clone())),
                     ret_type: x.clone(),
                     body: vec![
                         LStmt(EVariant(

@@ -27,12 +27,12 @@ counter()! // "1".
 fn fac = n: Int : Int { if n < 2 { 1 } else { n * fac (n - 1) }}
 fac 1 !
 fac 2 !
-fac 20 !
+fac 50 !
 
 fn fib = n: Int : Int { if n < 2 { 1 } else { fib (n - 1) + fib (n - 2) }}
 fib 3 !
 fib 4 !
-fib 8 !
+fib 20 !
 
 fn f() -> Int { return 5; }
 

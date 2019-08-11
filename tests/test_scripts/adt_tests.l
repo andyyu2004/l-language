@@ -1,10 +1,13 @@
-data B = T | F;
+{
+    data B = T | F;
 
-let x = T;
+    let x = T;
 
-if let y = x { 1! } else { 0! }
+    if let y = x { 1! } else { 0! }
 
-if let T = x { 11! } else { 10! }
+    if let T = x { 11! } else { 10! }
+
+}
 
 {
 
@@ -108,6 +111,36 @@ if let T = x { 11! } else { 10! }
 
 }
 
+
+{
+    data List = Nil | Cons Number List;
+
+    fn map = f: Int -> Int => xs: List : List {if let Cons x xs = xs {Cons (f x) (map f xs)} else {Nil}}
+
+    fn x2 = n: Int : Int { 2 * n }
+
+    let xs = Cons 4 (Cons 7 Nil);
+
+    map x2 xs !
+}
+
+{
+    data Either = Left Bool | Right Int;
+
+    fn test = e: Either {
+        if let Left b = e {
+            b !
+        } else if let Right i = e {
+            i !
+        }
+    }
+
+    let x = Left false;
+    test x;
+    let y = Right 5;
+    test y;
+
+}
 
 
 

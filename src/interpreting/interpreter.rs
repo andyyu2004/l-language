@@ -56,8 +56,8 @@ impl Interpreter {
             PrintStmt(expr) => Ok(println!("{}", self.evaluate(&expr)?.borrow())),
             VarStmt { name, init, ..} => self.var_stmt(name, init),
             LetStmt {name, init, .. } => self.let_stmt(name, init),
-            FnStmt { name, token, params, ret_type, body} =>
-                self.execute_fn_decl(name, token, params, ret_type, body),
+            FnStmt { name, token, param, ret_type, body} =>
+                self.execute_fn_decl(name, token, param, ret_type, body),
             FnCurried { name, token, param, ret} => self.execute_curried_fn_decl(name, token, param, *ret),
             ReturnStmt { value, .. } => self.execute_return_stmt(value),
             WhileStmt { condition, body, .. } => self.execute_while(condition, body),
@@ -107,11 +107,11 @@ impl Interpreter {
         self.var_stmt(name, Some(expr))
     }
 
-    fn execute_fn_decl(&mut self, name: Option<String>, token: Token, params: Vec<Pair<LType>>, ret_type: LType, body: Vec<Stmt>) -> Result<(), InterpreterError> {
+    fn execute_fn_decl(&mut self, name: Option<String>, token: Token, param: Option<Pair<LType>>, ret_type: LType, body: Vec<Stmt>) -> Result<(), InterpreterError> {
         let fstmt = FnStmt {
             name: name.clone(),
             token: token.clone(),
-            params: params.clone(),
+            param: param.clone(),
             ret_type: ret_type.clone(),
             body: body.clone()
         };
@@ -330,7 +330,7 @@ impl Interpreter {
 
     fn evaluate_if_let(&mut self, token: &Token, pattern: &LPattern, scrutinee: &Expr, left: &Vec<Stmt>, right: &Expr) -> Result<Rc<RefCell<LObject>>, InterpreterError> {
         let s_obj = self.evaluate(scrutinee)?; // .borrow() as &dyn Matchable;
-        let matched = s_obj.borrow_mut().is_match(pattern);
+        let matched = s_obj.borrow().is_match(pattern);
         if matched {
             let mut env = Env::new(Some(Rc::clone(&self.env)));
             let bindings = s_obj.borrow_mut().bindings(pattern);

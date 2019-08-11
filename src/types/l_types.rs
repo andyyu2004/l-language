@@ -92,7 +92,7 @@ impl Display for LType {
             TRecord(xs) | TVariant(xs) => write!(f, "{{{}}}", format_record(xs, ", ")),
             TTuple(xs) =>
                 if xs.len() == 0 { write!(f, "{}", TUnit)}
-                else if xs.len() == 1 { write!(f, "{}", xs[0]) }
+//                else if xs.len() == 1 { write!(f, "{}", xs[0]) }
                 else { write!(f, "({})", format_tuple(xs)) },
             TArrow(left, right) => match **left {
                 TArrow(_, _) => write!(f, "({}) -> {}", left, right),
@@ -105,15 +105,15 @@ impl Display for LType {
 
 // Has full equivalence
 impl Eq for LType {}
-
-impl PartialEq<Vec<LType>> for LType {
-    fn eq(&self, other: &Vec<LType>) -> bool {
-        match (self, other) {
-            (TTuple(xs), ys) => xs == ys,
-            _ => false
-        }
-    }
-}
+//
+//impl PartialEq<Vec<LType>> for LType {
+//    fn eq(&self, other: &Vec<LType>) -> bool {
+//        match (self, other) {
+//            (TTuple(xs), ys) => xs == ys,
+//            _ => false
+//        }
+//    }
+//}
 
 impl PartialEq for LType {
     fn eq(&self, other: &Self) -> bool {
@@ -126,12 +126,13 @@ impl PartialEq for LType {
             (TUnit, TUnit) => true,
             (TTuple(xs), TUnit) => xs.is_empty(), // TUnit is just convenient way to represent empty tuple
             (TUnit, TTuple(ys)) => ys.is_empty(),
-            (TTuple(xs), TTuple(ys)) => if xs.len() == 1 { &xs[0] == ys } // Allow nested singleton tuple equivalence
-                else if ys.len() == 1 { &ys[0] == xs } else { xs == ys },
-            (TTuple(xs), t) => xs.len() == 1 && t == &xs[0], // Order matters for some reason for eq
-            (t, TTuple(ys)) => ys.len() == 1 && t == &ys[0],
-//            (TTuple(xs), t) => xs.len() == 1 && &xs[0] == t, // Singleton tuple is equivalent to the containing type
-//            (t, TTuple(ys)) => ys.len() == 1 && &ys[0] == t,
+//            (TTuple(xs), TTuple(ys)) => if xs.len() == 1 { &xs[0] == ys } // Allow nested singleton tuple equivalence
+//                else if ys.len() == 1 { &ys[0] == xs } else { xs == ys },
+//            (TTuple(xs), t) => xs.len() == 1 && t == &xs[0], // Order matters for some reason for eq
+//            (t, TTuple(ys)) => ys.len() == 1 && t == &ys[0],
+            (TTuple(xs), TTuple(ys)) => xs == ys,
+            (TTuple(xs), t) => xs.len() == 1 && &xs[0] == t, // Singleton tuple is equivalent to the containing type
+            (t, TTuple(ys)) => ys.len() == 1 && &ys[0] == t,
             (TData(x), TData(y)) => x == y,
             // Order is not important, but naming is in records
             (TRecord(xs), TRecord(ys)) => xs == ys,

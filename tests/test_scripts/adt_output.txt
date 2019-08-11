@@ -17,3 +17,6 @@ tree
 sum tree
 30
 4
+(Cons 8 (Cons 14 Nil))
+false
+5

@@ -30,20 +30,10 @@ impl LInvocable for Function {
                 Ok(Rc::new(RefCell::new(LFunction(Function::new(*ret.clone(), Rc::clone(&env))))))
             },
 
-            FnStmt { params, ret_type, body, name,.. } => {
-                let paramnames = params.iter().map(|x| x.clone().name).collect::<Vec<String>>();
-                if !params.is_empty() {
-                    env.borrow_mut().define(paramnames[0].clone(), Some(arg.clone()));
+            FnStmt { param, ret_type, body, name,.. } => {
+                if let Some(param) = param {
+                    env.borrow_mut().define(param.name.clone(), Some(arg.clone()));
                 }
-//                if let LTuple(ref xs) = *arg.borrow() {
-//                    for (i, p) in paramnames.iter().enumerate() {
-//                        env.borrow_mut().define(p.to_string(), Some(xs[i].clone()))
-//                    }
-//                } else if paramnames.len() == 1 {
-//                    env.borrow_mut().define(paramnames[0].clone(), Some(arg.clone()));
-//                    println!("env: {:?}", env);
-//                }
-
                 interpreter.execute_block(body, env)
             },
             _ => panic!("Invoke on non function")

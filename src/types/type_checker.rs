@@ -92,7 +92,7 @@ impl TypeChecker {
     fn type_of_statement(&mut self, stmt: &Stmt) -> Result<LType, LTypeError> {
         match stmt {
             LStmt(expr) | ExprStmt(expr) | PrintStmt(expr) => self.type_of_expr(expr),
-            FnStmt { name, token, params, ret_type, body } => self.type_of_fn(name, token, params, ret_type, body),
+            FnStmt { name, token, param, ret_type, body } => self.type_of_fn(name, token, param, ret_type, body),
             FnCurried { name, param, ret, .. } => self.type_of_curried_fn(name, param, ret),
             VarStmt { name, ltype, init}  => self.type_of_var_decl(name, ltype, init.as_ref()),
             LetStmt { name, ltype, init} => self.type_of_var_decl(name, ltype, Some(init)),
@@ -464,28 +464,31 @@ impl TypeChecker {
         }
     }
 
-    fn type_of_fn(&mut self, name: &Option<String>, token: &Token, params: &Vec<Pair<LType>>, ret: &LType, body: &Vec<Stmt>) -> Result<LType, LTypeError> {
+    fn type_of_fn(&mut self, name: &Option<String>, token: &Token, param: &Option<Pair<LType>>, ret: &LType, body: &Vec<Stmt>) -> Result<LType, LTypeError> {
         let ret = ret.clone().map_string_to_type(&self.types)?;
         let prev_ret_type = self.curr_fn_ret_type.clone();
         self.curr_fn_ret_type = Some(ret.clone());
 
-        let ptypes = params.iter()
-            .map(|x| x.value.clone().map_string_to_type(&self.types))
-            .collect::<Result<Vec<LType>, LTypeError>>()?;
-        let ftype = TArrow(Box::new(TTuple(ptypes.clone())), Box::new(ret.clone()));
+        // Let parameter type be either the type of the parameter or TUnit it no parameter
+        let ptype = if let Some(param) = param {
+            let t = param.value.clone().map_string_to_type(&self.types)?;
+            self.env.borrow_mut().define(param.name.clone(), t.clone());
+            t
+        } else {
+            TUnit
+        };
+
+        // Let the function type be the parameter type -> return type
+        let ftype = TArrow(Box::new(ptype.clone()), Box::new(ret.clone()));
 
         let enclosing = Rc::clone(&self.env);
         let env = Env::new(Some(Rc::clone(&self.env)));
-
-        for (i, param) in params.iter().enumerate() {
-            self.env.borrow_mut().define(param.name.clone(), ptypes[i].clone());
-        }
 
         if let Some(fname) = &self.curr_fname {
             // Takes the accumulated type and adds the parameter here and the return type to form the full type for a curried function
             self.curr_ftype = Some(TArrow(
                 Box::new(self.curr_ftype.clone().unwrap()), Box::new(
-                    TArrow(Box::new(ptypes[0].clone()), Box::new(ret.clone()))
+                    TArrow(Box::new(ptype), Box::new(ret.clone()))
                 )
             ));
             self.env.borrow_mut().define(fname.clone(), self.curr_ftype.clone().unwrap())
@@ -520,6 +523,7 @@ impl TypeChecker {
         }
 
         // Accumulating the type in a self variable to allow for recursive definitions
+        // Otherwise the env will not have the function defined, but we can't define the function until the type is calculated etc...
         match &self.curr_ftype {
             Some(t) => self.curr_ftype = Some(TArrow(Box::new(t.clone()), Box::new(ptype.clone()))),
             None => self.curr_ftype = Some(ptype.clone())
@@ -530,7 +534,6 @@ impl TypeChecker {
 //        let ftype = TArrow(Box::new(ptype), Box::new(self.type_of_statement(ret)?));
 
         self.env = enclosing;
-
 
         let ftype = self.curr_ftype.clone().unwrap();
         if let Some(name) = name {

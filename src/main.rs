@@ -22,10 +22,13 @@ use crate::types::type_checker::TypeChecker;
 use crate::parsing::Mode;
 use crate::static_analysis::StaticAnalyser;
 
+fn test(x: (i32, i32)) -> i32 {
+    x.0 + x.1
+}
+
 fn main() {
 
     let args = env::args().collect::<Vec<String>>();
-
     if args.len() == 2 {
         let path = &args[1];
         match fs::read_to_string(path) {

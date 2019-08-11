@@ -19,7 +19,7 @@ pub enum Stmt {
     ReturnStmt { token: Token, value: Option<Expr> },
     VarStmt { name: Token, ltype: Option<LType>, init: Option<Expr> },
     LetStmt { name: Token, ltype: Option<LType>, init: Expr },
-    FnStmt { name: Option<String>, token: Token, params: Vec<Pair<LType>>, ret_type: LType, body: Vec<Stmt> },
+    FnStmt { name: Option<String>, token: Token, param: Option<Pair<LType>>, ret_type: LType, body: Vec<Stmt> },
     StructDecl { name: Token, fields: HashMap<String, LType> },
     FnCurried { name: Option<String>, token: Token, param: Pair<LType>, ret: Box<Stmt> },
     DataDecl { name: Token, variants: HashMap<String, LType> },
@@ -36,9 +36,9 @@ impl Display for Stmt {
             LetStmt { name, ltype, init } => write!(f, "var {} <- {}", name.lexeme, init),
             WhileStmt { condition, body, .. } => write!(f, "while {} {}", condition, format_block(body)),
 //            CurriedFn(, name, params, ret, body) => write!(f, "fn {} = {} : {} {{\n{}}}", name.lexeme, format_args(params, " => "), ret, format_block(body)),
-            FnStmt { name, params, ret_type, body, .. } => match name {
-                Some(name) => write!(f, "fn {} ({}) -> {} {{{}}}", name, format_args(params, ", "), ret_type, format_block(body)),
-                None => write!(f, "fn ({}) -> {} {{{}}}", format_args(params, ", "), ret_type, format_block(body)),
+            FnStmt { name, param, ret_type, body, .. } => match name {
+                Some(name) => write!(f, "fn {} ({}) -> {} {{{}}}", name, format_option(param), ret_type, format_block(body)),
+                None => write!(f, "fn ({}) -> {} {{{}}}",format_option(param), ret_type, format_block(body)),
             }
             FnCurried { name, param, ret, .. } => match name {
                 Some(name) => write!(f, "cfn {} {} => {}", name, param, ret),
@@ -53,6 +53,13 @@ impl Display for Stmt {
             DataDecl { name, variants } => write!(f, "data {} = {}", name, format_record(variants, " | ")),
             x => write!(f, "data {:?}", x)
         }
+    }
+}
+
+pub fn format_option<T>(arg: &Option<T>) -> String where T : Display {
+    match arg {
+        Some(x) => format!("{}", x),
+        None => "".to_string()
     }
 }
 

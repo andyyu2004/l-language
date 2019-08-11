@@ -50,7 +50,7 @@ impl StaticAnalyser {
             LStmt(expr) | ExprStmt(expr) | PrintStmt(expr) => self.analyse_expr(expr),
             VarStmt { name , init, .. } => self.analyse_var_decl(name, init),
             LetStmt{ name , init, ..} => self.analyse_let_binding(name, init),
-            FnStmt { name, params, body, ..} => self.analyse_fn_decl(name, params, body),
+            FnStmt { name, param, body, ..} => self.analyse_fn_decl(name, param, body),
             FnCurried{ name, param, ret, ..} => self.analyse_curried_fn_decl(name, param, ret),
             ReturnStmt { token, value } => self.analyse_return_stmt(token, value),
             WhileStmt { condition, body, ..} => {
@@ -218,15 +218,15 @@ impl StaticAnalyser {
         Ok(IEmpty)
     }
 
-    fn analyse_fn_decl(&mut self, name: &Option<String>, params: &Vec<Pair<LType>>, body: &Vec<Stmt>) -> Result<StaticInfo, LError> {
+    fn analyse_fn_decl(&mut self, name: &Option<String>, param: &Option<Pair<LType>>, body: &Vec<Stmt>) -> Result<StaticInfo, LError> {
         self.fstack.push(FunctionEnv::Function);
         if let Some(name) = name {
             self.env.borrow_mut().define(name.clone(), IFunction);
         }
         let enclosing = self.env.clone();
         self.env = Rc::new(RefCell::new(Env::new(Some(Rc::clone(&self.env)))));
-        for nt in params {
-            self.env.borrow_mut().define(nt.name.clone(), IVariable(true))
+        if let Some(param) = param {
+            self.env.borrow_mut().define(param.name.clone(), IVariable(true))
         }
         for stmt in body {
             self.analyse_stmt(stmt)?;

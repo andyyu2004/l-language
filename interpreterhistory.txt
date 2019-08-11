@@ -1,21 +1,3 @@
-Cons 4
-Cons 4 Nil
-data List = Nil | Cons Int List;
-Nil
-Cons 1 Nil
-Cons 22 Nil
-data List = Nil | Cons Int List;
-Cons 22 Nil
-Nil
-data List = Nil | Cons Int List;
-Nil
-data List = Nil | Cons Int List;
-Cons 1 Nil
-data List = Nil | Cons Int List;
-data Test = Test 
-data Test = Test;
-Test
-data Test = Test Int Bool Int
 data Test = Test Int Bool Int;
 Test 5
 Test 5 5
@@ -98,3 +80,21 @@ fn map = f: Int -> Int => xs: List : List {if let Cons x xs = xs {Cons (f x) (ma
 fn x2 = n: Int : Int { 2 * n }
 let xs = Cons 4 Nil;
 map x2 xs !
+data Either = Left Bool | Right Int;
+fn test = e: Either {
+        if let Left b = x {
+            b !
+        } else if let Right i = x {
+            i !
+        }
+    }
+(e)
+(2)
+(6)
+2 * (4+7)
+fn f(x: Int) -> Bool { false }
+2 * (4+7)
+fn f(x: Int) -> Bool { false }
+f(4)
+f()
+f(6)
