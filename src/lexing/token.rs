@@ -50,6 +50,7 @@ pub enum TokenType {
     Plus, Minus, Star, Slash, Caret, Number,
     LParen, RParen, LBrace, RBrace,
     EOF,
+    Lambda,
     Equal, DoubleEqual, Less, Greater, LessEqual, GreaterEqual, Bang, BangEqual,
     True, False,
     Semicolon,

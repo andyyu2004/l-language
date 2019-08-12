@@ -1,6 +1,6 @@
 path="tests/test_scripts"
 
-tests=("adt" "general" "recursion" "scoping" "tuple" "record")
+tests=("adt" "general" "recursion" "scoping" "tuple" "record" "lambda")
 
 for test in "${tests[@]}"; do
     echo "testing $test..."

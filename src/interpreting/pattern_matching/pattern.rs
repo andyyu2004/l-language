@@ -27,6 +27,7 @@ impl Display for LPattern {
 //            PRecord => {}
             PTuple(xs) => write!(f, "({})", format_tuple(xs)),
             PIdentifier(token) => write!(f, "PId {}", token.lexeme),
+            PLiteral(x) => write!(f, "PLit {}", x.lexeme),
             x => write!(f, "{:?}", x)
         }
     }
@@ -43,7 +44,8 @@ impl LPattern {
 
     pub fn is_refutable(&self) -> bool {
         match self {
-            PLiteral(_) | PWildcard | PIdentifier(_) => false,
+            PLiteral(_) => true,
+            PWildcard | PIdentifier(_) => false,
             PRecord => true, // Not implemented properly yet, just say true
             PConstructor(_, _) => true,
             PTuple(xs) => xs.iter().any(|p| p.is_refutable()), // PTuple is refutable if any of its subpatterns are refutable

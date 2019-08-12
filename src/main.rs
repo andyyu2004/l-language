@@ -130,7 +130,7 @@ fn main() {
             continue;
         }
 
-        if let Err(err) = typechecker.type_check(&statements) {
+        if let Err(err) = typechecker.type_check(&mut statements) {
             eprintln!("Typecheck error");
             err.iter().for_each(|e| eprint!("{}", e));
             continue;
@@ -186,7 +186,7 @@ pub fn execute(input: String) {
         process::exit(1)
     }
 
-    if let Err(err) = typechecker.type_check(&statements) {
+    if let Err(err) = typechecker.type_check(&mut statements) {
         eprintln!("Typecheck error");
         err.iter().for_each(|e| eprint!("{}", e));
         process::exit(1)

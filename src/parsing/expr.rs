@@ -7,6 +7,7 @@ use crate::parsing::Stmt;
 use crate::parsing::stmt::format_block;
 use std::collections::{HashMap, VecDeque};
 use crate::interpreting::pattern_matching::LPattern;
+use crate::types::LType;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
@@ -30,6 +31,7 @@ pub enum Expr {
     EIfLet { token: Token, pattern: LPattern, scrutinee: Box<Expr>, left: Vec<Stmt>, right: Box<Expr> },
     EVariant(String, Vec<Expr>),
     EList(Token, VecDeque<Expr>), // Deque for efficient insertion from both ends
+    ELambda { token: Token, param: LPattern, ltype: Option<LType>, body: Box<Expr> },
     EPanic
 }
 
@@ -60,6 +62,11 @@ impl Display for Expr {
                 EBlock(ref xs) if xs.is_empty() => write!(f, "if let {} = {} then {{{}}}", pattern, scrutinee, format_block(left)),
                 _ => write!(f, "if let {} = {} then {{{}}} else {{{}}}", pattern, scrutinee, format_block(left), right)
             },
+            ELambda { param, body , ltype, .. } => match ltype {
+                Some(t) => write!(f, "λ{}: {} => {}", param, t, body),
+                None => write!(f, "λ{} => {}", param, body),
+            }
+//            ELambda { params, body , .. } => write!(f, "λ{} -> {}", join(params, " "), body),
             EPanic => write!(f, "EPanic"),
             // x => write!(f, "{:?}", x)
         }

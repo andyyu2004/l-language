@@ -15,8 +15,8 @@ use crate::lexing::token::TokenType::{BangEqual, DoubleEqual, LessEqual, Greater
 use crate::types::l_types::LType::{TArrow};
 use crate::generation::{Generator};
 use crate::interpreting::pattern_matching::Matchable;
-use crate::interpreting::objects::l_object::LObject::{LFunction, LNumber, LBool, LVariant, LRecord, LTuple, LUnit, LStruct, LList, LString};
-use crate::interpreting::objects::{LObject, LInvocable, Variant, Function, Struct, Tuple};
+use crate::interpreting::objects::l_object::LObject::{LFunction, LNumber, LBool, LVariant, LRecord, LTuple, LUnit, LStruct, LList, LString, LLambda};
+use crate::interpreting::objects::{LObject, LInvocable, Variant, Function, Struct, Tuple, Lambda};
 
 pub struct Interpreter {
     pub env: Rc<RefCell<Env<Option<Rc<RefCell<LObject>>>>>>,
@@ -262,8 +262,15 @@ impl Interpreter {
             EList(_, xs) => Ok(Rc::new(RefCell::new(LList(
                 xs.iter().map(|x| self.evaluate(x)).collect::<Result<VecDeque<Rc<RefCell<LObject>>>, _>>()?
             )))),
+            ELambda { param, body, ..} => self.evaluate_lambda(param, body),
             _ => Err(InterpreterError::from(LError::new("Unknown expr type".to_string(), 0, 0)))
         }
+    }
+
+    fn evaluate_lambda(&mut self, param: &LPattern, body: &Expr) -> Result<Rc<RefCell<LObject>>, InterpreterError> {
+        let lambda = Lambda::new(param.clone(), body.clone(), Rc::clone(&self.env));
+        Ok(self.wrap(LLambda(lambda)))
+
     }
 
     fn evaluate_binary(&mut self, operator: &Token, left: &Expr, right: &Expr) -> Result<Rc<RefCell<LObject>>, InterpreterError> {
@@ -388,7 +395,7 @@ impl Interpreter {
     fn evaluate_curried_application(&mut self, _token: &Token, callee: &Expr, arg: &Expr) -> Result<Rc<RefCell<LObject>>, InterpreterError> {
         let callee_obj = self.evaluate(callee)?;
         let arg_obj = self.evaluate(arg)?;
-        let ret = callee_obj.borrow().function().invoke(arg_obj, self);
+        let ret = callee_obj.borrow().invocable().invoke(arg_obj, self);
         ret
     }
 

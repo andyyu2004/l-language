@@ -75,6 +75,36 @@ impl LType {
             _ => Ok(self)
         }
     }
+
+    pub fn map_string_to_type_ref(&mut self, env: &Env<LType>) -> Result<(), LTypeError> {
+        match self {
+            TList(t) => t.map_string_to_type_ref(env),
+            TArrow(l, r) => {
+                l.map_string_to_type_ref(env)?;
+                r.map_string_to_type_ref(env)
+            }
+            TTuple(xs) => {
+                xs.iter_mut().map(|x| x.map_string_to_type_ref(env)).collect::<Result<Vec<_>, _>>()?;
+                Ok(())
+            }
+            TRecord(xs) => {
+                xs.iter_mut().map(|(_, t)| t.map_string_to_type_ref(env)).collect::<Result<Vec<_>, _>>()?;
+                Ok(())
+            }
+
+            TVariant(xs) => {
+                xs.iter_mut().map(|(_, t)| t.map_string_to_type_ref(env)).collect::<Result<Vec<_>, _>>()?;
+                Ok(())
+            },
+            TName(name) => match env.resolve(&name) {
+                Ok(t) => {
+                    *self = t; Ok(())
+                },
+                Err(_) => Err(NonExistentType(name.clone()))
+            }
+            _ => Ok(())
+        }
+    }
 }
 
 impl Display for LType {

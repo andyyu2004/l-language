@@ -29,7 +29,6 @@ impl Lexer {
                 ' ' => {},
                 ',' => tokens.push(self.create_token(TokenType::Comma, char::to_string(&c))),
                 '_' => tokens.push(self.create_token(TokenType::Underscore, char::to_string(&c))), // This disallows underscore starting ids also
-                '*' => tokens.push(self.create_token(TokenType::Star, char::to_string(&c))),
                 '^' => tokens.push(self.create_token(TokenType::Caret, char::to_string(&c))),
                 '{' => tokens.push(self.create_token(TokenType::LBrace, char::to_string(&c))),
                 '}' => tokens.push(self.create_token(TokenType::RBrace, char::to_string(&c))),
@@ -40,6 +39,12 @@ impl Lexer {
                 ']' => tokens.push(self.create_token(TokenType::RSquare, char::to_string(&c))),
                 '$' => tokens.push(self.create_token(TokenType::Dollar, char::to_string(&c))),
                 '%' => tokens.push(self.create_token(TokenType::Modulo, char::to_string(&c))),
+                '\\' => tokens.push(self.create_token(TokenType::Lambda, char::to_string(&c))),
+                '*' => if self.match_next('=')  {
+                    tokens.push(self.create_token(TokenType::StarEqual, "*=".to_string()))
+                } else {
+                    tokens.push(self.create_token(TokenType::Star, char::to_string(&c)))
+                },
                 ':' => if self.match_next(':') {
                     tokens.push(self.create_token(TokenType::DoubleColon, "::".to_string()))
                 } else {
@@ -62,6 +67,8 @@ impl Lexer {
                     continue;
                 } else if self.match_next('*') {
 
+                } else if self.match_next('=') {
+                    tokens.push(self.create_token(TokenType::SlashEqual, "/=".to_string()))
                 } else {
                     tokens.push(self.create_token(TokenType::Slash, char::to_string(&c)))
                 },

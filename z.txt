@@ -8,5 +8,13 @@
         }     
     }
 
+    fn times_3(n: Int) -> Int { n * 3 }
+
+    map times_3!
+    let xs = Cons 0 (Cons 1 (Cons 2 (Cons 3 (Cons 4 Nil))));
+
+    map times_3 xs!
+
+    map (\x: Int => x * 2) xs !
 
 }

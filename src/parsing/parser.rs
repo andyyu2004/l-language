@@ -10,7 +10,7 @@ use crate::types::l_types::LType::{TTuple, TRecord, TName, TArrow, TUnit, TList}
 use crate::parsing::expr::Expr::*;
 use std::fmt::{Display};
 use std::collections::{HashMap, VecDeque};
-use crate::lexing::token::TokenType::{Plus, Minus};
+use crate::lexing::token::TokenType::{Plus, Minus, Star, Slash};
 use crate::interpreting::pattern_matching::LPattern;
 use crate::interpreting::pattern_matching::LPattern::*;
 use itertools::Itertools;
@@ -379,11 +379,13 @@ impl Parser {
             } else {
                 Err(LError::from_token(format!("Cannot assign to {}, not an l-value", expr), &token))
             }
-        } else if self.r#match(&[TokenType::PlusEqual, TokenType::MinusEqual]) {
+        } else if self.r#match(&[TokenType::PlusEqual, TokenType::MinusEqual, TokenType::StarEqual, TokenType::SlashEqual]) {
             let mut operator = self.previous().clone();
             operator.ttype = match operator.ttype {
                 TokenType::PlusEqual => Plus,
                 TokenType::MinusEqual => Minus,
+                TokenType::StarEqual => Star,
+                TokenType::SlashEqual => Slash,
                 _ => unreachable!()
             };
             let right = self.parse_assignment()?;
@@ -448,6 +450,8 @@ impl Parser {
                 return Ok(PTuple(self.parse_tuple(&Parser::parse_pattern)?))
             }
             pattern
+        } else if self.r#match(&[TokenType::Number, TokenType::String]) {
+            Ok(PLiteral(self.previous().clone()))
         } else {
             Err(LError::from_token("Bad pattern".to_string(), self.current()))
         }
@@ -472,7 +476,7 @@ impl Parser {
                 })
             }
         } else {
-            self.parse_block_expr()
+            self.parse_lambda()
         }
     }
 
@@ -506,6 +510,19 @@ impl Parser {
             }
         } else {
             Ok(EBlock(vec![]))
+        }
+    }
+
+    fn parse_lambda(&mut self) -> Result<Expr, LError> {
+        if self.match1(TokenType::Lambda) {
+            let token = self.previous().clone();
+            let param = self.parse_pattern()?;
+            let ltype = if self.match1(TokenType::Colon) { Some(self.parse_type()?) } else { None };
+            self.expect(TokenType::RightFatArrow)?;
+            let body = self.parse_expression()?;
+            Ok(ELambda { token, ltype, param, body: Box::new(body) })
+        } else {
+            self.parse_block_expr()
         }
     }
 
@@ -637,6 +654,7 @@ impl Parser {
 //        expr
 //    }
 
+    // Applicative space and get/set dot have equal precedence
     fn parse_app_dot(&mut self) -> Result<Expr, LError> {
         let mut expr = self.parse_primary();
         loop {

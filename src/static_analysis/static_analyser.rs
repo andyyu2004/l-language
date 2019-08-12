@@ -1,10 +1,10 @@
 use crate::parsing::{Stmt, Expr};
 use crate::errors::LError;
-use crate::parsing::stmt::Stmt::{LStmt, ExprStmt, VarStmt, LetStmt, FnStmt, FnCurried, ReturnStmt, PrintStmt, TypeAlias, WhileStmt, StructDecl, DataDecl};
+use crate::parsing::stmt::Stmt::*;
 use crate::interpreting::{Env, LPattern};
-use crate::parsing::expr::Expr::{EVariable, EApplication, EAssignment, EBlock, EIf, ERecord, ELogic, EBinary, EGet, ETuple, ESet, EDataConstructor, EMatch, EIfLet, EList};
+use crate::parsing::expr::Expr::*;
 use crate::static_analysis::StaticInfo;
-use crate::static_analysis::static_info::StaticInfo::{IVariable, ILetBinding, IFunction, IEmpty, IConstructor};
+use crate::static_analysis::StaticInfo::*;
 use crate::lexing::Token;
 use crate::types::l_types::Pair;
 use crate::types::LType;
@@ -94,6 +94,7 @@ impl StaticAnalyser {
             EMatch { .. } => panic!("match should be desugared"), //self.analyse_match(token, expr, branches),
             ELogic { operator, left, right} | EBinary { operator, left, right } =>
                 self.analyse_binary(operator, left, right),
+            ELambda { token, param, body, .. } => self.analyse_lambda(token, param, body),
             _ => Ok(IEmpty)
         }
     }
@@ -103,6 +104,21 @@ impl StaticAnalyser {
             Ok(x) => Ok(x),
             Err(_) => Err(LError::from_token(format!("Undefined Data Constructor {}", name.lexeme), name))
         }
+    }
+
+    fn analyse_lambda(&mut self, token: &Token, param: &LPattern, body: &Expr) -> Result<StaticInfo, LError> {
+        if param.is_refutable() {
+            return Err(LError::from_token("Cannot use refutable pattern in lambda binding".to_string(), token))
+        }
+        let bindings = self.get_pattern_bindings(param)?;
+        let enclosing = Rc::clone(&self.env);
+        self.env = Rc::new(RefCell::new(Env::new(Some(Rc::clone(&self.env)))));
+        for (k, v) in bindings {
+            self.env.borrow_mut().define(k, v);
+        }
+        let res = self.analyse_expr(body);
+        self.env = enclosing;
+        res
     }
 
     fn analyse_application(&mut self, callee: &Expr, arg: &Expr) -> Result<StaticInfo, LError> {

@@ -18,7 +18,7 @@ pub enum LTypeError {
     NonExistentDataConstructor(Token),
     NonExistentField(Token, LType),
     NotGettable(Token, LType),
-    RequireTypeAnnotation(Token),
+    RequireTypeAnnotation(Token, String),
     BadPattern(LPattern, LType, Token, String),
     InvalidDeclaration, // When function does not exist, due to definition having failed, don't report error as it is fallthrough
 }
@@ -30,7 +30,7 @@ impl Display for LTypeError {
             TypeError(l, r, token, note) =>
                 write!(f, "{}", LError::from_token(format!("Expected type {}, got {}. {}", l, r, note), token)),
             NonFunction(t, token) => write!(f, "{}", LError::from_token(format!("Expected function type, got {}", t), token)),
-            RequireTypeAnnotation(token) => write!(f, "{}", LError::from_token("Unintialised var declaration requires type signature".to_string(), token)),
+            RequireTypeAnnotation(token, note) => write!(f, "{}", LError::from_token(format!("Require type annotation. {}", note), token)),
             NonExistentType(token) => write!(f, "{}", LError::from_token(format!("Cannot find type {}", token.lexeme), token)),
             NonExistentField(token, ltype) => write!(f, "{}", LError::from_token(format!("Field {} does not exist on type {}", token.lexeme, ltype), token)),
             InvalidDeclaration => write!(f, "Invalid decl"), // Ok(()) // Caused by cascaded failure, otherwise static analysis would have caught it
