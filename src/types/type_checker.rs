@@ -365,17 +365,12 @@ impl TypeChecker {
         let tcallee = self.type_of_expr(callee)?;
         let targ = self.type_of_expr(arg)?;
         if let TArrow(tparam, tret) = tcallee {
-            if *tparam == targ { Ok(*tret) }
-            else {
+            if *tparam == targ {
+                Ok(*tret)
+            } else {
                 self.validate_generic_application(token, targ, *tparam, *tret)
 //                let note = format!("Expected type {} as annotated in signature, found type {}", tparam, targ);
 //                Err(TypeError(*tparam, targ, token.clone(), note))
-            }
-        } else if let TGeneric(ltype, _type_parameters, .. ) = tcallee {
-            if let TArrow(tparam, tret) = *ltype {
-                self.validate_generic_application(token, targ, *tparam, *tret)
-            } else {
-                Err(NonFunction(*ltype.clone(), token.clone(), format!("The type contained in a function type was a non-arrow type")))
             }
         } else {
             Err(NonFunction(tcallee, token.clone(), format!("Applying to a type other than a function type or arrow type")))
@@ -383,7 +378,6 @@ impl TypeChecker {
     }
 
     // Doesn't even requires the TGeneric construct. Any type parameter can be used without declaration currently
-    // Leaving the TGeneric construct as it may be useful
     fn validate_generic_application(&self, token: &Token, targ: LType, tparam: LType, mut tret: LType) -> Result<LType, LTypeError> {
         if !tparam.is_type_matchable(&targ) {
             let note = format!("Cannot match type {} to generic type {}", targ, tparam);
@@ -582,12 +576,7 @@ impl TypeChecker {
         } else { TUnit };
 
         // Let the function type be the parameter type -> return type
-        let type_parameters = ptype.type_parameters();
-        let ftype = if !type_parameters.is_empty() {
-            TGeneric(Box::new(TArrow(Box::new(ptype.clone()), Box::new(ret.clone()))), type_parameters)
-        } else {
-            TArrow(Box::new(ptype.clone()), Box::new(ret.clone()))
-        };
+        let ftype = TArrow(Box::new(ptype.clone()), Box::new(ret.clone()));
 
         // Allows typechecking of recursive functions. Assume it has type stated in fn definition.
         if let Some(name) = name {
@@ -625,12 +614,7 @@ impl TypeChecker {
             self.env.borrow_mut().define(name.clone(), defined_type)
         }
 
-        let type_parameters = param.value.type_parameters();
-        let ftype = if !type_parameters.is_empty() {
-            TGeneric(Box::new(TArrow(Box::new(param.value.clone()), Box::new(self.type_of_statement(ret)?))), type_parameters)
-        } else {
-            TArrow(Box::new(param.value.clone()), Box::new(self.type_of_statement(ret)?))
-        };
+        let ftype = TArrow(Box::new(param.value.clone()), Box::new(self.type_of_statement(ret)?));
 
         self.env = enclosing;
 

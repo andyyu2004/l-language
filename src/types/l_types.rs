@@ -57,7 +57,7 @@ pub enum LType {
     TName(TypeName),
     TVar(Token),
     TData(Token, HashMap<Token, Option<LType>>), // Token is name, and map is Mapping from type paraneter to concrete type
-    TGeneric(Box<LType>, Vec<Token>), // The Tokens represents the type parameter of the argument
+//    TGeneric(Box<LType>, Vec<Token>), // The Tokens represents the type parameter of the argument
     // TNothing
 }
 
@@ -66,7 +66,7 @@ impl LType {
     pub fn type_parameters(&self) -> Vec<Token> {
         match self {
             TVar(token) => vec![token.clone()],
-            TGeneric(ltype, tparams) => tparams.clone().into_iter().chain(ltype.type_parameters()).collect(),
+//            TGeneric(ltype, tparams) => tparams.clone().into_iter().chain(ltype.type_parameters()).collect(),
             TArrow(l, r) => l.type_parameters().into_iter().chain(r.type_parameters()).collect(),
             TTuple(xs) => xs.iter().flat_map(|x| x.type_parameters()).collect_vec(),
             TRecord(xs)
@@ -173,7 +173,7 @@ impl LType {
             (TVariant(xs), TVariant(ys)) =>
                 xs.values().len() == ys.values().len()
                     && xs.values().zip(ys.values()).all(|(x,y)| x.is_type_matchable(y)),
-//            (TGeneric(t, ), TGeneric(_, _)) => {}
+            
             _ => false
         }
     }
@@ -209,20 +209,20 @@ impl LType {
             TVariant(xs) => TVariant((xs.iter().map(|(k, v)| (k.clone(), v.substitute_type_parameters(tparam, with)))).collect()),
             TList(xs) => TList(Box::new(xs.substitute_type_parameters(tparam, with))),
 //            TName(typename) =>
-            TGeneric(ltype, tparams) => if tparams.contains(tparam) {
-//                // If generic matches remove generic and substitute
-                if tparams.len() <= 1 { // Will be empty after removal, so skip that step
-                    ltype.substitute_type_parameters(tparam, with)
-                } else {
-                    let mut tparams = tparams.clone();
-                    let index = tparams.iter().position(|x| x == tparam).unwrap();
-                    tparams.remove(index);
-                    TGeneric(ltype.clone(), tparams)
-                }
-            } else {
-                // Else keep generic type but propogate substitution
-                TGeneric(Box::new(ltype.substitute_type_parameters(tparam, with)), tparams.clone())
-            }
+//            TGeneric(ltype, tparams) => if tparams.contains(tparam) {
+////                // If generic matches remove generic and substitute
+//                if tparams.len() <= 1 { // Will be empty after removal, so skip that step
+//                    ltype.substitute_type_parameters(tparam, with)
+//                } else {
+//                    let mut tparams = tparams.clone();
+//                    let index = tparams.iter().position(|x| x == tparam).unwrap();
+//                    tparams.remove(index);
+//                    TGeneric(ltype.clone(), tparams)
+//                }
+//            } else {
+//                // Else keep generic type but propogate substitution
+//                TGeneric(Box::new(ltype.substitute_type_parameters(tparam, with)), tparams.clone())
+//            }
             t => t.clone()
         }
     }
@@ -249,8 +249,8 @@ impl Display for LType {
                 TArrow(_, _) => write!(f, "({}) -> {}", left, right),
                 _                   => write!(f, "{} -> {}", left, right),
             },
-            TData(name) => write!(f, "{}", name),
-            TGeneric(ltype, tparams) => write!(f, "TGeneric<{}> {}", join(tparams, ", "), ltype)
+            TData(name, mapping) => write!(f, "{}", name),
+//            TGeneric(ltype, tparams) => write!(f, "TGeneric<{}> {}", join(tparams, ", "), ltype)
 //                write!(f, "TFunc :: {} sub {:?}", ltype, map)
         }
     }
@@ -271,7 +271,7 @@ impl Eq for LType {}
 impl PartialEq for LType {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (TGeneric(a, b), TGeneric(x, y)) => a == x && b == y,
+//            (TGeneric(a, b), TGeneric(x, y)) => a == x && b == y,
             (TVar(x), TVar(y)) => x == y,
             (TTop, _) | (_, TTop) => true, // TTop can be used in place of any type
             (TBool, TBool) => true,
@@ -288,7 +288,7 @@ impl PartialEq for LType {
             (TTuple(xs), TTuple(ys)) => xs == ys,
             (TTuple(xs), t) => xs.len() == 1 && &xs[0] == t, // Singleton tuple is equivalent to the containing type
             (t, TTuple(ys)) => ys.len() == 1 && &ys[0] == t,
-            (TData(x), TData(y)) => x == y,
+            (TData(x, _ma), TData(y, _mb)) => x == y,
             // Order is not important, but naming is in records
             (TRecord(xs), TRecord(ys)) => xs == ys,
 //                 xs.iter().map(|x| &x.value).collect::<Vec<&LType>>() == ys.iter().map(|y| &y.value).collect::<Vec<&LType>>(),

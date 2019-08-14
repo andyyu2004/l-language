@@ -1,16 +1,3 @@
-fn f() { 5! }
-let g = f;
-g == f
-let g = f;
-fn f() { 5! }
-let g = f;
-g == f
-fn f<'a, 'b> = x: 'a => y: 'b => z: 'a { x! y! z! }
-let g = f;
-g==f
-let i = g 5;
-let i = g 5 "d";
-let i = g 5 "d"; 4
 fn f = x: 'a => y: 'b => z: 'a { x! y! z! }
 fn f = x: 'a -> 'b => y: 'b => z: 'a { x! y! z! }
 f 5
@@ -98,3 +85,16 @@ data List<'a> = Nil | Cons 'a List<'a>;
 Cons 4
 data List<'a> = Nil | Cons 'a List<'a>;
 Cons 4
+data List<'a> = Nil | Cons 'a List<'a>;
+fn f = x: 'a => y: 'b => z: 'a { x! y! }
+f 2
+f 2 3
+f 2 3 3
+f 2 3 "f"
+f 2 "f" 4
+fn f = x: 'a => y: 'b => z: 'a { x! y! }
+f 2 "f" 4
+let f(x: Int) { x }
+fn f(x: Int) { x }
+fn f(x: Int) { x ! }
+f 5
