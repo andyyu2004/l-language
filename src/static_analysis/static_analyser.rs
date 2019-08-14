@@ -6,13 +6,14 @@ use crate::parsing::expr::Expr::*;
 use crate::static_analysis::StaticInfo;
 use crate::static_analysis::StaticInfo::*;
 use crate::lexing::Token;
-use crate::types::l_types::Pair;
+use crate::types::l_types::{Pair, TypeName};
 use crate::types::LType;
 use std::collections::HashMap;
 use itertools::Itertools;
 use std::rc::Rc;
 use std::cell::RefCell;
 use crate::interpreting::pattern_matching::LPattern::*;
+use crate::types::l_types::LType::TVar;
 
 enum FunctionEnv {
 //    None,
@@ -51,28 +52,30 @@ impl StaticAnalyser {
             LStmt(expr) | ExprStmt(expr) | PrintStmt(expr) => self.analyse_expr(expr),
             VarStmt { name , init, .. } => self.analyse_var_decl(name, init),
             LetStmt{ token, pattern , init, ..} => self.analyse_let_binding(token, pattern, init),
-            FnStmt { name, param, body, ..} => self.analyse_fn_decl(name, param, body),
-            FnCurried{ name, param, ret, ..} => self.analyse_curried_fn_decl(name, param, ret),
+            FnStmt { name, param, body, tparams, token, ..} =>
+                self.analyse_fn_decl(token, name, param, body, tparams),
+            FnCurried{ name, param, ret, tparams, token, ..} =>
+                self.analyse_curried_fn_decl(token, name, param, ret, tparams),
             ReturnStmt { token, value } => self.analyse_return_stmt(token, value),
             WhileStmt { condition, body, ..} => {
                 self.analyse_expr(condition)?;
                 self.analyse_block_e(body)
             }
             TypeAlias {..} => Ok(IEmpty),
-            DataDecl { name, variants } => self.analyse_data_decl(name, variants),
+            DataDecl { name, variants, .. } => self.analyse_data_decl(name, variants),
             StructDecl { name, fields} => self.analyse_struct(name, fields),
             x => unimplemented!("Unimplemented in analyse stmt {}", x)
         }
     }
 
-    fn analyse_data_decl(&self, _name: &Token, variants: &HashMap<String, LType>) -> Result<StaticInfo, LError> {
+    fn analyse_data_decl(&self, _name: &TypeName, variants: &HashMap<String, LType>) -> Result<StaticInfo, LError> {
         for (k, v) in variants {
             self.env.borrow_mut().define(k.clone(), IConstructor(v.curried_arity()));
         }
         Ok(IEmpty)
     }
 
-    fn analyse_struct(&self, _name: &Token, _fields: &HashMap<String, LType>) -> Result<StaticInfo, LError> {
+    fn analyse_struct(&self, _name: &TypeName, _fields: &HashMap<String, LType>) -> Result<StaticInfo, LError> {
         Ok(IEmpty)
     }
 
@@ -244,7 +247,12 @@ impl StaticAnalyser {
         Ok(IEmpty)
     }
 
-    fn analyse_fn_decl(&mut self, name: &Option<String>, param: &Option<Pair<LType>>, body: &Vec<Stmt>) -> Result<StaticInfo, LError> {
+    fn analyse_fn_decl(&mut self, token: &Token, name: &Option<String>, param: &Option<Pair<LType>>, body: &Vec<Stmt>, tparams: &Vec<Token>) -> Result<StaticInfo, LError> {
+//        if let Some(Pair { value: TVar(t), .. }) = &param {
+//            if !tparams.contains(t) {
+//                return Err(LError::from_token(format!("Type parameter {} was not declared in function signature", t), token))
+//            }
+//        }
         self.fstack.push(FunctionEnv::Function);
         if let Some(name) = name {
             self.env.borrow_mut().define(name.clone(), IFunction);
@@ -262,7 +270,13 @@ impl StaticAnalyser {
         Ok(IEmpty)
     }
 
-    fn analyse_curried_fn_decl(&mut self, name: &Option<String>, param: &Pair<LType>, ret: &Stmt) -> Result<StaticInfo, LError> {
+    fn analyse_curried_fn_decl(&mut self, token: &Token, name: &Option<String>, param: &Pair<LType>, ret: &Stmt, tparams: &Vec<Token>) -> Result<StaticInfo, LError> {
+//        if let TVar(t) = &param.value {
+//            if !tparams.contains(t) {
+//                return Err(LError::from_token(format!("Type parameter {} was not declared in function signature", t), token))
+//            }
+//        }
+
         if let Some(name) = name {
             self.env.borrow_mut().define(name.clone(), IFunction);
         }

@@ -7,6 +7,7 @@ use crate::lexing::{Token};
 use crate::types::l_types::Pair;
 use crate::parsing::expr::Expr::{EVariant};
 use itertools::Itertools;
+use std::rc::Rc;
 
 //pub fn generate_function_from_type(ltype: &LType, ret: Expr) -> Result<Stmt, InterpreterError> {
 //    if let TArrow(left, right) = ltype {
@@ -60,6 +61,7 @@ impl Generator {
                 TArrow(_, _) => Ok(FnCurried {
                     name: if self.is_first_iter { Some(self.fn_name.clone()) } else { None },
                     token: Token::dummy(),
+                    tparams: Rc::new(vec![]),
                     param: Pair::new(self.get_var(), *left.clone()),
                     ret: Box::new(self.generate_function_from_type(right)?)
                 }),
@@ -68,6 +70,7 @@ impl Generator {
                     token: Token::dummy(),
                     param: Some(Pair::new(self.get_var(), *left.clone())),
                     ret_type: x.clone(),
+                    tparams: Rc::new(vec![]),
                     body: vec![
                         LStmt(EVariant(
                             self.fn_name.clone(),

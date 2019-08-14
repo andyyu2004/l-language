@@ -1,0 +1,8 @@
+false
+0
+identity
+0
+5
+printstring
+str
+abc

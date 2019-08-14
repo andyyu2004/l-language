@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Env<T> where T : Clone {
-    vars: HashMap<String, T>,
+    pub vars: HashMap<String, T>,
     outer: Option<Rc<RefCell<Env<T>>>>
 }
 

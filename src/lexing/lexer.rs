@@ -109,6 +109,10 @@ impl Lexer {
                 } else {
                     tokens.push(self.create_token(TokenType::Dot, char::to_string(&c)))
                 },
+                '\'' => {
+                    tokens.push(self.lex_type_variable());
+                    continue
+                },
                 '0'...'9' => {
                     let start_col = self.col;
                     let num = self.lex_number();
@@ -124,7 +128,7 @@ impl Lexer {
                         acc.push(self.peek());
                         self.inc_indexes()
                     }
-                    if self.peek() != '"' {
+                    if self.at_end() || self.peek() != '"' {
                         errors.push(LError::new("Unterminated string literal".to_string(), self.line, start_col));
                     } else {
                         tokens.push(Token::new(TokenType::String, acc, self.line, start_col))
@@ -156,6 +160,16 @@ impl Lexer {
         if errors.is_empty() { Ok(tokens) }
         else { Err(errors) }
 
+    }
+
+    fn lex_type_variable(&mut self) -> Token {
+        let start_col = self.col;
+        let mut acc = self.next().unwrap().to_string();
+        while !self.at_end() && self.peek().is_ascii_alphabetic() {
+            acc.push(self.peek());
+            self.inc_indexes()
+        }
+        Token::new(TokenType::TypeVar, acc, self.line, start_col)
     }
 
     fn create_token(&self, ttype: TokenType, lexeme: String) -> Token {
@@ -201,9 +215,8 @@ impl Lexer {
             } else { self.i -= 1; }
         }
         acc
-
-
     }
+
 
 }
 
@@ -218,13 +231,13 @@ impl Lexer {
         Lexer::is_identifier_start(c) || '0' <= c && c <= '9' || 'A' <= c && c <= 'Z' || c == '\''
     }
 
-    // fn next(&mut self) -> Option<char> {
-    //     let x = self.safe_peek();
-    //     if x.is_some() {
-    //         self.inc_indexes();
-    //         x
-    //     } else { None }
-    // }
+     fn next(&mut self) -> Option<char> {
+         let x = self.safe_peek();
+         if x.is_some() {
+             self.inc_indexes();
+             x
+         } else { None }
+     }
 
     fn match1(&mut self, c: char) -> bool {
         if self.safe_peek().map_or(false, |x| x == c) {

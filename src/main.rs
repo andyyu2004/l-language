@@ -55,12 +55,16 @@ fn main() {
     loop {
         let input = match rl.readline("\\>>: ") {
             Ok(ref line) if line.is_empty() => { continue; }
-            Ok (ref line) if line == ":e" => {
+            Ok (ref line) if line == ":tenv" => {
                 rl.add_history_entry(line.as_str());
                 if rl.save_history("interpreterhistory.txt").is_err() {
                     eprintln!("Failed to save history");
                 }
-                println!("{:#?}", interpreter.env);
+//                println!("{:?}", interpreter.env); // Can't print this, recursiveness leads to overflow
+//                println!("{:?}", typechecker.env);
+                for (k, v) in &typechecker.env.borrow().vars {
+                    println!("{} :: {}", k, v);
+                }
                 continue;
             },
             Ok(ref line) if line.starts_with(":t") => {

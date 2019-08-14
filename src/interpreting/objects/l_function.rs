@@ -7,7 +7,7 @@ use std::cell::RefCell;
 use crate::interpreting::objects::l_object::LObject::LFunction;
 use crate::interpreting::objects::{LObject, LInvocable};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Function {
     declaration: Stmt,
     pub closure: Rc<RefCell<Env<Option<Rc<RefCell<LObject>>>>>>,
@@ -25,7 +25,7 @@ impl LInvocable for Function {
     fn invoke(&self, arg: Rc<RefCell<LObject>>, interpreter: &mut Interpreter) -> Result<Rc<RefCell<LObject>>, InterpreterError> {
         let env = Rc::new(RefCell::new(Env::new(Some(Rc::clone(&self.closure)))));
         match &self.declaration {
-            FnCurried { name: _, token: _, param, ret } => {
+            FnCurried { name, param, ret, .. } => {
                 env.borrow_mut().define(param.name.clone(), Some(Rc::clone(&arg)));
                 Ok(Rc::new(RefCell::new(LFunction(Function::new(*ret.clone(), Rc::clone(&env))))))
             },
@@ -47,10 +47,17 @@ impl Display for Function {
         match &self.declaration {
             FnStmt { name, .. } => match name {
                 Some(name) => write!(f, "[Function {} [{}]]", name, self.declaration),
-                None => write!(f, "Function [{}]", self.declaration),
+                None => write!(f, "[Function [{}]]", self.declaration),
             }
-            _ => write!(f, "CFunction [{}]]", self.declaration),
+            _ => write!(f, "[CFunction [{}]]", self.declaration),
         }
+    }
+}
+
+impl PartialEq for Function {
+    fn eq(&self, other: &Self) -> bool {
+        // Don't include closure otherwise it goes crazy. (Infinite loop as the closure contains its own definition)
+        self.declaration == other.declaration
     }
 }
 

@@ -1,32 +1,12 @@
-{
-    data List = Nil | Cons Int List;
-
-    fn map = f: Int -> Int => xs: List: List {
-        match xs {
-            | Cons x xs -> Cons (f x) (map f xs)
-            | Nil -> Nil
-        }
-    }
-
-    fn times_3(n: Int) -> Int { n * 3 }
-
-    map times_3!
-    let xs = Cons 0 (Cons 1 (Cons 2 (Cons 3 (Cons 4 Nil))));
-
-    map times_3 xs!
-
-    map (\x: Int => x * 2) xs !
-}
-
 // Generics
 
 {
     fn identity(x: 'a) -> 'a { x }
-    
+
     identity false !
     identity 0 !
     identity "identity" !
-} 
+}
 {
     fn f = x: 'a => y: 'a {
         x! y!
@@ -51,9 +31,3 @@
     higherorder abc 5 false ! // This does correctly enforce the types currently 'a -> Int and 'b -> Bool
 
 }
-
- {
-     // Polymorphic ADTs
-     data List = Nil | Cons 'a List;
-     Cons 5 (Cons 6 Nil) !
- }

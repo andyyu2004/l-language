@@ -4,9 +4,9 @@ use crate::lexing::token::TokenType;
 use crate::parsing::{Expr, Stmt, Mode};
 use crate::errors::LError;
 use crate::types::LType;
-use crate::types::l_types::Pair;
+use crate::types::l_types::{Pair, TypeName};
 use crate::parsing::stmt::Stmt::*;
-use crate::types::l_types::LType::{TTuple, TRecord, TName, TArrow, TUnit, TList};
+use crate::types::l_types::LType::{TTuple, TRecord, TName, TArrow, TUnit, TList, TVar};
 use crate::parsing::expr::Expr::*;
 use std::fmt::{Display};
 use std::collections::{HashMap, VecDeque};
@@ -14,6 +14,7 @@ use crate::lexing::token::TokenType::{Plus, Minus, Star, Slash};
 use crate::interpreting::pattern_matching::LPattern;
 use crate::interpreting::pattern_matching::LPattern::*;
 use itertools::Itertools;
+use std::rc::Rc;
 
 /*
 <expr> ::= <addition>
@@ -178,7 +179,7 @@ impl Parser {
     }
 
     fn parse_type_alias(&mut self) -> Result<Stmt, LError> {
-        let name = self.expect(TokenType::Typename)?.clone();
+        let name = self.parse_type_name()?;
         self.expect(TokenType::Equal)?;
         let ltype = self.parse_type()?;
         self.expect(TokenType::Semicolon)?;
@@ -216,6 +217,9 @@ impl Parser {
 
     fn parse_fn_decl(&mut self) -> Result<Stmt, LError> {
         let token = self.expect(TokenType::Identifier)?.clone();
+        let tparams = Rc::new(if self.match1(TokenType::Less) {
+            self.parse_type_parameters()?
+        } else { vec![] });
         // Some holes in the previous design of functional definitions
         // Only allow parameterless or single parameter functions to be declared in shorthand way
         if self.match1(TokenType::LParen) {
@@ -224,30 +228,30 @@ impl Parser {
             let ret_type = if self.match1(TokenType::RightArrow) { self.parse_type()? } else { TUnit };
             self.expect(TokenType::LBrace)?;
             let body = self.parse_block()?;
-            Ok(FnStmt{ name: Some(token.lexeme.clone()), token, param, ret_type, body })
+            Ok(FnStmt{ name: Some(token.lexeme.clone()), token, tparams: Rc::clone(&tparams),param, ret_type, body })
         } else if self.match1(TokenType::Equal) {
-            self.parse_curried_fn_decl(Some(token.lexeme))
+            self.parse_curried_fn_decl(Some(token.lexeme), tparams)
         } else {
-            Err(LError::from_token("Invalid syntax, expected '=' or '('".to_string(), self.current()))
+            Err(LError::from_token(format!("Invalid syntax, expected '=' or '(', found {}", self.current()), self.current()))
         }
     }
 
     // Only name function on first iteration
-    fn parse_curried_fn_decl(&mut self, name: Option<String>) -> Result<Stmt, LError> {
+    fn parse_curried_fn_decl(&mut self, name: Option<String>, tparams: Rc<Vec<Token>>) -> Result<Stmt, LError> {
         // fn f = x: Int => y: Bool => z: Bool : ret { body } // Optional colon indicating type
         let token = self.current().clone();
         let param = self.parse_name_type_pair()?;
         if self.match1(TokenType::RightFatArrow) {
-            let right = self.parse_curried_fn_decl(None)?;
-            Ok(FnCurried { name, token, param, ret: Box::new(right) })
+            let right = self.parse_curried_fn_decl(None, Rc::clone(&tparams))?;
+            Ok(FnCurried { name, token, param, tparams, ret: Box::new(right) })
         } else if self.match1(TokenType::Colon) {
             let ret_type = self.parse_type()?;
             self.expect(TokenType::LBrace)?;
             let body = self.parse_block()?;
-            Ok(FnStmt { name, token, param: Some(param), ret_type, body })
+            Ok(FnStmt { name, token, param: Some(param), tparams, ret_type, body })
         } else if self.match1(TokenType::LBrace) {
             let body = self.parse_block()?;
-            Ok(FnStmt { name, token, param: Some(param),  ret_type: TUnit, body })
+            Ok(FnStmt { name, token, param: Some(param), tparams, ret_type: TUnit, body })
         } else {
             Err(LError::from_token("Invalid curried function syntax".to_string(), &token))
         }
@@ -296,9 +300,10 @@ impl Parser {
             Ok(TRecord(self.parse_record(&Parser::parse_type)?))
         } else if self.match1(TokenType::LSquare) {
             Ok(TList(Box::new(self.parse_type()?)))
+        } else if self.match1(TokenType::TypeVar){
+            Ok(TVar(self.previous().clone()))
         } else {
-            let typename= self.expect(TokenType::Typename)?;
-            Ok(TName(typename.clone()))
+            Ok(TName(self.parse_type_name()?))
         }
     }
 
@@ -322,14 +327,15 @@ impl Parser {
     }
 
     fn parse_struct(&mut self) -> Result<Stmt, LError> {
-        let name = self.expect(TokenType::Typename)?.clone();
+        let name = self.parse_type_name()?;
         self.expect(TokenType::LBrace)?;
         let fields = self.parse_record(&Parser::parse_type)?;
         Ok(StructDecl { name, fields })
     }
 
+    // data List<T> = Nil | Cons T List<T>
     fn parse_data(&mut self) -> Result<Stmt, LError> {
-        let name = self.expect(TokenType::Typename)?.clone();
+        let name = self.parse_type_name()?;
         self.expect(TokenType::Equal)?;
         let mut variants = HashMap::new();
         while {
@@ -342,6 +348,31 @@ impl Parser {
         } {}
         self.expect(TokenType::Semicolon)?;
         Ok(DataDecl { name, variants })
+    }
+
+    fn parse_type_name(&mut self) -> Result<TypeName, LError> {
+        // No higher kinds, can't nested type parameters <'m<'a>>
+//        let name = if self.r#match(&[TokenType::Typename, TokenType::TypeVar]) {
+//            self.previous().clone()
+//        } else { return Err(LError::from_token(format!("Expected Typename or Type Variable, found {}", self.current()), self.current())) };
+        let name = self.expect(TokenType::Typename)?.clone();
+        let tparams = if self.match1(TokenType::Less) {
+            self.parse_type_parameters()?
+        } else { vec![] };
+        Ok(TypeName::new(name, tparams))
+    }
+
+    // Allow empty <> as syntactically correct
+    fn parse_type_parameters(&mut self) -> Result<Vec<Token>, LError> {
+        let mut vec = vec![];
+        if self.current().ttype != TokenType::Greater {
+            while {
+                vec.push(self.expect(TokenType::TypeVar)?.clone());
+                self.match1(TokenType::Comma)
+            } {}
+        }
+        self.expect(TokenType::Greater)?;
+        Ok(vec)
     }
 
     fn parse_variant_type(&mut self, mut t: LType) -> Result<LType, LError> {
@@ -457,6 +488,7 @@ impl Parser {
         }
     }
 
+//    if` expressions without `else` evaluate to `()`
     fn parse_conditional(&mut self) -> Result<Expr, LError> {
         if self.match1(TokenType::If) {
             if self.match1(TokenType::Let) {
@@ -748,7 +780,7 @@ impl Parser {
     fn parse_record<F, T>(&mut self, f: &F) -> Result<HashMap<String, T>, LError>
         where F: Fn(&mut Self) -> Result<T, LError>, T : Display {
         let mut v = HashMap::new();
-        while self.current().ttype != TokenType::RBrace && self.current().ttype != TokenType::EOF {
+        while self.current().ttype != TokenType::RBrace {
             let current_line = self.current().line;
             let current_col = self.current().col;
             let pair = self.parse_record_entry(f)?;

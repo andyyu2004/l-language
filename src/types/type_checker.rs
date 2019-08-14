@@ -2,7 +2,7 @@ use crate::parsing::{Expr, Stmt, Mode};
 use crate::lexing::{TokenType, Token};
 use crate::types::{LType, LTypeError};
 use crate::types::l_types::LType::*;
-use crate::types::l_types::Pair;
+use crate::types::l_types::{Pair, TypeName};
 use crate::parsing::expr::Expr::*;
 use crate::interpreting::Env;
 use crate::types::LTypeError::*;
@@ -15,14 +15,13 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use crate::interpreting::pattern_matching::LPattern;
 use itertools::Itertools;
+use crate::utility::vec_to_map;
 
 pub struct TypeChecker {
-    env: Rc<RefCell<Env<LType>>>, // Variable -> Type
+    pub env: Rc<RefCell<Env<LType>>>, // Variable -> Type
     types: Env<LType>, // Typename -> Type
     curr_fn_ret_type: Option<LType>, // Type check return statements
-    // Some helper for typechecking recursive curried definitions
-    curr_ftype: Option<LType>,
-    curr_fname: Option<String>,
+
     mode: Mode
 }
 
@@ -33,12 +32,11 @@ impl TypeChecker {
         types.define("Bool".to_string(), TBool);
         types.define("Int".to_string(), TNum);
         types.define("Number".to_string(), TNum);
+        types.define("String".to_string(), TString);
         types.define("Unit".to_string(), TUnit);
         TypeChecker {
             env: Rc::new(RefCell::new(Env::new(None))),
             curr_fn_ret_type: None,
-            curr_ftype: None,
-            curr_fname: None,
             types,
             mode
         }
@@ -70,7 +68,7 @@ impl TypeChecker {
             EBinary { operator, left, right } => self.type_of_binary(operator, left, right),
             EUnary { operator, operand } => self.type_of_unary(operator, operand),
             EVariable { name } => self.type_of_variable(name),
-            EApplication { token, callee, arg} => self.type_of_curry_application(token, callee, arg),
+            EApplication { token, callee, arg} => self.type_of_application(token, callee, arg),
             EAssignment { lvalue, expr } => self.type_of_assignment(lvalue, expr),
             EIf { condition, left, right, token } => self.type_of_if(token, condition, left, right),
             EBlock(xs) => self.type_of_block_e(xs),
@@ -93,26 +91,31 @@ impl TypeChecker {
     fn type_of_statement(&mut self, stmt: &mut Stmt) -> Result<LType, LTypeError> {
         match stmt {
             LStmt(ref mut expr) | ExprStmt(ref mut expr) | PrintStmt(ref mut expr) => self.type_of_expr(expr),
-            FnStmt { name, token, param, ret_type, body } => self.type_of_fn(name, token, param, ret_type, body),
-            FnCurried { name, param, ret, .. } => self.type_of_curried_fn(name, param, ret),
-            VarStmt { name, ltype, ref mut init}  => self.type_of_var_decl(name, ltype, init.as_mut()),
-            LetStmt { pattern, ref mut ltype, ref mut init, token} => self.type_of_let_binding(token, pattern, ltype, init),
-            ReturnStmt { token, ref mut value } => self.type_of_return(token, value),
+            FnStmt { name, token, param, ret_type, body, tparams } =>
+                self.type_of_fn(name, token, tparams, param,ret_type, body),
+            FnCurried { name, tparams, param, ret, token } =>
+                self.type_of_curried_fn(name, token, tparams, param, ret),
+            VarStmt { name, ltype, init}  => self.type_of_var_decl(name, ltype, init.as_mut()),
+            LetStmt { pattern, ltype, init, token} => self.type_of_let_binding(token, pattern, ltype, init),
+            ReturnStmt { token, value } => self.type_of_return(token, value),
             TypeAlias { name, ltype } => self.define_type_alias(name, ltype),
-            WhileStmt { token, ref mut condition, ref mut body} => self.type_of_while(token, condition, body),
+            WhileStmt { token, condition, body} => self.type_of_while(token, condition, body),
             StructDecl { name, fields} => self.type_of_struct(name, fields),
             DataDecl { name, variants} => self.type_of_data_decl(name, variants),
             _ => panic!("Unimplented in type_check_stmt")
         }
     }
 
-    fn type_of_data_decl(&mut self, name: &Token, variants: &HashMap<String, LType>) -> Result<LType, LTypeError> {
-        self.types.define(name.lexeme.clone(), TData(name.lexeme.clone()));
-        for (k, v) in variants {
-            // Define data constructors as functions
-            self.env.borrow_mut().define(k.clone(), v.clone().map_string_to_type(&self.types)?)
+    fn type_of_data_decl(&mut self, typename: &TypeName, variants: &mut HashMap<String, LType>) -> Result<LType, LTypeError> {
+        let tdata = TData(typename.name.clone(), vec_to_map(typename.tparams.to_vec()));
+
+        self.types.define(typename.name.lexeme.clone(), tdata);
+        let mut variants = variants.clone();
+        for (k, v) in &mut variants {
+            v.map_string_to_type_ref(&self.types)?;
+            self.env.borrow_mut().define(k.clone(), v.clone())
         }
-        Ok(TVariant(variants.clone()))
+        Ok(TVariant(variants))
     }
 
     fn type_of_get(&mut self, name: &Token, expr: &mut Expr) -> Result<LType, LTypeError> {
@@ -129,7 +132,7 @@ impl TypeChecker {
         Ok(ltype)
     }
 
-    fn type_of_struct(&mut self, _name: &Token, _fields: &HashMap<String, LType>) -> Result<LType, LTypeError> {
+    fn type_of_struct(&mut self, _name: &TypeName, _fields: &HashMap<String, LType>) -> Result<LType, LTypeError> {
 //        self.env.borrow_mut().define(name.lexeme.clone(), ),
         Ok(TUnit)
     }
@@ -327,7 +330,10 @@ impl TypeChecker {
     fn type_of_variable(&mut self, name: &Token) -> Result<LType, LTypeError> {
         match self.env.borrow().resolve(name) {
             Ok(t) => Ok(t),
-            Err(_) => Err(InvalidDeclaration) // If variable is not found here it is due to bad types in declaration
+            Err(_) => {
+                println!("Couldn't find variable {}", name);
+                Err(InvalidDeclaration)
+            } // If variable is not found here it is due to bad types in declaration
         }
     }
 
@@ -355,17 +361,42 @@ impl TypeChecker {
         ret
     }
 
-    fn type_of_curry_application(&mut self, token: &Token, callee: &mut Expr, arg: &mut Expr) -> Result<LType, LTypeError> {
+    fn type_of_application(&mut self, token: &Token, callee: &mut Expr, arg: &mut Expr) -> Result<LType, LTypeError> {
         let tcallee = self.type_of_expr(callee)?;
         let targ = self.type_of_expr(arg)?;
         if let TArrow(tparam, tret) = tcallee {
-            if targ != *tparam {
-                Err(TypeError(*tparam.clone(), targ.clone(), token.clone(), format!("Expected argument type of {}, found type {}", tparam, targ)))
+            if *tparam == targ { Ok(*tret) }
+            else {
+                self.validate_generic_application(token, targ, *tparam, *tret)
+//                let note = format!("Expected type {} as annotated in signature, found type {}", tparam, targ);
+//                Err(TypeError(*tparam, targ, token.clone(), note))
             }
-            else { Ok(*tret) }
+        } else if let TGeneric(ltype, _type_parameters, .. ) = tcallee {
+            if let TArrow(tparam, tret) = *ltype {
+                self.validate_generic_application(token, targ, *tparam, *tret)
+            } else {
+                Err(NonFunction(*ltype.clone(), token.clone(), format!("The type contained in a function type was a non-arrow type")))
+            }
         } else {
-            Err(NonFunction(tcallee, token.clone()))
+            Err(NonFunction(tcallee, token.clone(), format!("Applying to a type other than a function type or arrow type")))
         }
+    }
+
+    // Doesn't even requires the TGeneric construct. Any type parameter can be used without declaration currently
+    // Leaving the TGeneric construct as it may be useful
+    fn validate_generic_application(&self, token: &Token, targ: LType, tparam: LType, mut tret: LType) -> Result<LType, LTypeError> {
+        if !tparam.is_type_matchable(&targ) {
+            let note = format!("Cannot match type {} to generic type {}", targ, tparam);
+            return Err(TypeMismatch(tparam, targ, token.clone(), note))
+        }
+        let substitutions = tparam.generate_substitutions(&targ);
+//                println!("Substutitons");
+//                substitutions.iter().for_each(|(k, v)| println!("{} -> {}", k, v));
+        // Can probably be accomplished with fold but keep it simple for more clarity
+        for (parameter, ltype) in substitutions {
+            tret = tret.substitute_type_parameters(&parameter, &ltype);
+        }
+        Ok(tret)
     }
 
     fn type_of_assignment(&mut self, lvalue: &Token, expr: &mut Expr) -> Result<LType, LTypeError> {
@@ -373,7 +404,7 @@ impl TypeChecker {
         let texpr = self.type_of_expr(expr)?;
         if tlvalue == texpr {
             if let TRecord(_) = texpr {
-                // Make it easier to index into record if names match
+                // Make it easier to index into record if labels match (as record equality is done by comparing hashmaps)
                 self.env.borrow_mut().update(&lvalue.lexeme, texpr)
             }
             Ok(tlvalue)
@@ -487,9 +518,9 @@ impl TypeChecker {
         Ok(TUnit)
     }
 
-    fn define_type_alias(&mut self, name: &Token, ltype: &LType) -> Result<LType, LTypeError> {
-        let ltype = ltype.clone().map_string_to_type(&self.types)?;
-        self.types.define(name.lexeme.clone(), ltype.clone().map_string_to_type(&self.types)?);
+    fn define_type_alias(&mut self, typename: &TypeName, ltype: &mut LType) -> Result<LType, LTypeError> {
+        ltype.map_string_to_type_ref(&self.types)?;
+        self.types.define(typename.name.lexeme.clone(), ltype.clone());
         Ok(ltype.clone())
     }
 
@@ -534,37 +565,31 @@ impl TypeChecker {
         }
     }
 
-    fn type_of_fn(&mut self, name: &Option<String>, token: &Token, param: &Option<Pair<LType>>, ret: &mut LType, body: &Vec<Stmt>) -> Result<LType, LTypeError> {
-        ret.map_string_to_type_ref(&self.types)?;
+    fn type_of_fn(&mut self, name: &Option<String>, token: &Token, tparams: &Rc<Vec<Token>>, param: &Option<Pair<LType>>, ret: &mut LType, body: &Vec<Stmt>) -> Result<LType, LTypeError> {
         let prev_ret_type = self.curr_fn_ret_type.clone();
+
+        ret.map_string_to_type_ref(&self.types)?; // This is used multiple times below, don't move
         self.curr_fn_ret_type = Some(ret.clone());
+
+        let enclosing = Rc::clone(&self.env);
+        self.env = self.wrap(Env::new(Some(Rc::clone(&self.env))));
 
         // Let parameter type be either the type of the parameter or TUnit it no parameter
         let ptype = if let Some(param) = param {
             let t = param.value.clone().map_string_to_type(&self.types)?;
             self.env.borrow_mut().define(param.name.clone(), t.clone());
             t
-        } else {
-            TUnit
-        };
+        } else { TUnit };
 
         // Let the function type be the parameter type -> return type
-        let ftype = TArrow(Box::new(ptype.clone()), Box::new(ret.clone()));
+        let type_parameters = ptype.type_parameters();
+        let ftype = if !type_parameters.is_empty() {
+            TGeneric(Box::new(TArrow(Box::new(ptype.clone()), Box::new(ret.clone()))), type_parameters)
+        } else {
+            TArrow(Box::new(ptype.clone()), Box::new(ret.clone()))
+        };
 
-        let enclosing = Rc::clone(&self.env);
-        // let env = Env::new(Some(Rc::clone(&self.env)));
-
-        if let Some(fname) = &self.curr_fname {
-            // Takes the accumulated type and adds the parameter here and the return type to form the full type for a curried function
-            self.curr_ftype = Some(TArrow(
-                Box::new(self.curr_ftype.clone().unwrap()), Box::new(
-                    TArrow(Box::new(ptype), Box::new(ret.clone()))
-                )
-            ));
-            self.env.borrow_mut().define(fname.clone(), self.curr_ftype.clone().unwrap())
-        }
-
-        // Allows typechecking of recursive types. Assume it has type stated in fn definition.
+        // Allows typechecking of recursive functions. Assume it has type stated in fn definition.
         if let Some(name) = name {
             self.env.borrow_mut().define(name.clone(), ftype.clone())
         }
@@ -572,46 +597,60 @@ impl TypeChecker {
         let dummy_ret = ReturnStmt { token: Token::dummy(), value: Some(ELiteral(Token::dummy())) };
         let has_explicit_ret = body.iter().any(|x| self.match_discriminant(x, &dummy_ret));
         let block_type = self.type_of_block_e(body)?;
-        if &block_type != ret && !has_explicit_ret {
+        if &block_type != ret && !has_explicit_ret { // Checks the implicit return is type correct
             return Err(TypeError(ret.clone(), block_type.clone(), token.clone(), format!("Function is annotated to have return type {}, but found {}", ret, block_type)));
         }
 
         self.env = enclosing;
-
         self.curr_fn_ret_type = prev_ret_type;
+
+        // Define function in the outer scope so it can be referenced
+        if let Some(name) = name {
+            self.env.borrow_mut().define(name.clone(), ftype.clone())
+        }
+
         Ok(ftype)
     }
 
-    fn type_of_curried_fn(&mut self, name: &Option<String>, ntpair: &mut Pair<LType>, ret: &mut Stmt) -> Result<LType, LTypeError> {
+    fn type_of_curried_fn(&mut self, name: &Option<String>, _token: &Token, _tparams: &Rc<Vec<Token>>, param: &mut Pair<LType>, ret: &mut Stmt) -> Result<LType, LTypeError> {
         let enclosing = self.env.clone();
-        self.env = Rc::new(RefCell::new(Env::new(Some(self.env.clone()))));
+        self.env = self.wrap(Env::new(Some(self.env.clone())));
 
-        ntpair.value.map_string_to_type_ref(&self.types)?;
+        param.value.map_string_to_type_ref(&self.types)?;
+        self.env.borrow_mut().define(param.name.clone(), param.value.clone());
 
+        // Do this so recursive type checking works
         if let Some(name) = name {
-            self.curr_fname = Some(name.clone())
+            let defined_type = TArrow(Box::new(param.value.clone()), Box::new(self.type_of_function_by_definition(ret)?));
+            self.env.borrow_mut().define(name.clone(), defined_type)
         }
 
-        // Accumulating the type in a self variable to allow for recursive definitions
-        // Otherwise the env will not have the function defined, but we can't define the function until the type is calculated etc...
-        match &self.curr_ftype {
-            Some(t) => self.curr_ftype = Some(TArrow(Box::new(t.clone()), Box::new(ntpair.value.clone()))),
-            None => self.curr_ftype = Some(ntpair.value.clone())
-        }
-
-        self.env.borrow_mut().define(ntpair.name.clone(), ntpair.value.clone());
-        self.type_of_statement(ret)?;
-//        let ftype = TArrow(Box::new(ptype), Box::new(self.type_of_statement(ret)?));
+        let type_parameters = param.value.type_parameters();
+        let ftype = if !type_parameters.is_empty() {
+            TGeneric(Box::new(TArrow(Box::new(param.value.clone()), Box::new(self.type_of_statement(ret)?))), type_parameters)
+        } else {
+            TArrow(Box::new(param.value.clone()), Box::new(self.type_of_statement(ret)?))
+        };
 
         self.env = enclosing;
 
-        let ftype = self.curr_ftype.clone().unwrap();
         if let Some(name) = name {
-            self.env.borrow_mut().define(name.clone(), ftype.clone());
+            self.env.borrow_mut().define(name.clone(), ftype.clone())
         }
-        self.curr_ftype = None;
-        self.curr_fname = None;
+
         Ok(ftype)
+    }
+
+    fn type_of_function_by_definition(&mut self, stmt: &Stmt) -> Result<LType, LTypeError> {
+        match stmt {
+            FnCurried { param, ret , .. } =>
+                Ok(TArrow(Box::new(param.value.clone().map_string_to_type(&self.types)?), Box::new(self.type_of_function_by_definition(ret)?))),
+            FnStmt { name, param, ret_type, .. } => match param {
+                Some(t) => Ok(TArrow(Box::new(t.clone().value.map_string_to_type(&self.types)?), Box::new(ret_type.clone().map_string_to_type(&self.types)?))),
+                None => Ok(TArrow(Box::new(TUnit), Box::new(ret_type.clone().map_string_to_type(&self.types)?))),
+            },
+            x => panic!("Badness in type of function by def, got non function stmt {}", x)
+        }
     }
 
 //    fn type_of_curried_fn(&mut self, token: &Token, ntpair: &Vec<NameTypePair>, ret: &LType) -> LType {
@@ -626,7 +665,12 @@ impl TypeChecker {
     }
 
     // Matches based on enum variant only
-     fn match_discriminant(&mut self, x: &Stmt, y: &Stmt) -> bool {
+    fn match_discriminant(&mut self, x: &Stmt, y: &Stmt) -> bool {
         discriminant(x) == discriminant(y)
-     }
+    }
+
+    fn wrap<T>(&self, x: T) -> Rc<RefCell<T>> {
+        Rc::new(RefCell::new(x))
+    }
+
 }

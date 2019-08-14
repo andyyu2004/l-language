@@ -2,7 +2,7 @@ use crate::interpreting::{Env, InterpreterError, LPattern};
 use crate::lexing::{TokenType, Token};
 use crate::parsing::{Expr, Stmt, Mode};
 use crate::errors::LError;
-use crate::types::l_types::Pair;
+use crate::types::l_types::{Pair, TypeName};
 use crate::types::LType;
 use crate::parsing::stmt::Stmt::*;
 use crate::parsing::expr::Expr::*;
@@ -56,19 +56,20 @@ impl Interpreter {
             PrintStmt(expr) => Ok(println!("{}", self.evaluate(&expr)?.borrow())),
             VarStmt { name, init, ..} => self.var_stmt(name, init),
             LetStmt { pattern, init, .. } => self.let_stmt(pattern, init),
-            FnStmt { name, token, param, ret_type, body} =>
-                self.execute_fn_decl(name, token, param, ret_type, body),
-            FnCurried { name, token, param, ret} => self.execute_curried_fn_decl(name, token, param, *ret),
+            FnStmt { name, token, param, tparams, ret_type, body, .. } =>
+                self.execute_fn_decl(name, token, tparams, param, ret_type, body),
+            FnCurried { name, token, tparams, param, ret, ..} =>
+                self.execute_curried_fn_decl(name, token, tparams, param, *ret),
             ReturnStmt { value, .. } => self.execute_return_stmt(value),
             WhileStmt { condition, body, .. } => self.execute_while(condition, body),
             TypeAlias {..} => Ok(()),
-            DataDecl { name, variants } => self.execute_data_decl(name, variants),
+            DataDecl { name, variants, .. } => self.execute_data_decl(name, variants),
             StructDecl { name, fields } => self.execute_struct(name, fields),
             // x => Err(InterpreterError::from(LError::new(format!("Unknown stmt type {}", x), -1, -1)))
         }
     }
 
-    fn execute_data_decl(&mut self, _name: Token, variants: HashMap<String, LType>) -> Result<(), InterpreterError> {
+    fn execute_data_decl(&mut self, _name: TypeName, variants: HashMap<String, LType>) -> Result<(), InterpreterError> {
         for (k, v) in &variants {
             if let TArrow(_, _) = v {
                 // Generates some L code that is a function that returns a variant (to allow partial application)
@@ -81,9 +82,9 @@ impl Interpreter {
         Ok(())
     }
 
-    fn execute_struct(&mut self, name: Token, fields: HashMap<String, LType>) -> Result<(), InterpreterError> {
-        let lstruct = Struct::new(name.clone(), fields);
-        self.env.borrow_mut().define(name.lexeme, Some(self.wrap(LStruct(lstruct))));
+    fn execute_struct(&mut self, typename: TypeName, fields: HashMap<String, LType>) -> Result<(), InterpreterError> {
+        let lstruct = Struct::new(typename.clone(), fields);
+        self.env.borrow_mut().define(typename.name.lexeme, Some(self.wrap(LStruct(lstruct))));
         Ok(())
     }
 
@@ -118,13 +119,14 @@ impl Interpreter {
         }
     }
 
-    fn execute_fn_decl(&mut self, name: Option<String>, token: Token, param: Option<Pair<LType>>, ret_type: LType, body: Vec<Stmt>) -> Result<(), InterpreterError> {
+    fn execute_fn_decl(&mut self, name: Option<String>, token: Token, tparams: Rc<Vec<Token>>, param: Option<Pair<LType>>, ret_type: LType, body: Vec<Stmt>) -> Result<(), InterpreterError> {
         let fstmt = FnStmt {
             name: name.clone(),
-            token: token.clone(),
-            param: param.clone(),
-            ret_type: ret_type.clone(),
-            body: body.clone()
+            tparams,
+            token,
+            param,
+            ret_type,
+            body,
         };
         let lfunction = self.wrap(LFunction(Function::new(fstmt.clone(), Rc::clone(&self.env))));
         if let Some(name) = name {
@@ -134,9 +136,9 @@ impl Interpreter {
         Ok(())
     }
 
-    fn execute_curried_fn_decl(&mut self, name: Option<String>, token: Token, param: Pair<LType>, ret: Stmt) -> Result<(), InterpreterError> {
+    fn execute_curried_fn_decl(&mut self, name: Option<String>, token: Token, tparams: Rc<Vec<Token>>, param: Pair<LType>, ret: Stmt) -> Result<(), InterpreterError> {
         let lfunction = self.wrap(LFunction(
-            Function::new(FnCurried { name: name.clone(), token, param, ret: Box::new(ret) }, Rc::clone(&self.env))
+            Function::new(FnCurried { name: name.clone(), token, param, tparams, ret: Box::new(ret) }, Rc::clone(&self.env))
         ));
         if let Some(name) = name {
             self.env.borrow_mut().define(name, Some(Rc::clone(&lfunction)));
@@ -242,7 +244,8 @@ impl Interpreter {
                 _ => unreachable!()
             },
             ELiteral(token) => Ok(Interpreter::literal_to_l_object(token)),
-            EDataConstructor { name} | EVariable { name, .. } => self.evaluate_variable(name),
+            EDataConstructor { name}
+                | EVariable { name, .. } => self.evaluate_variable(name),
             ETuple(_, xs) => Ok(Rc::new(RefCell::new(LTuple(Tuple::new(
                 xs.iter().map(|x| self.evaluate(x)).collect::<Result<Vec<Rc<RefCell<LObject>>>, _>>()?
             ))))),
@@ -301,7 +304,7 @@ impl Interpreter {
         } else if eq_ops.contains(&operator.ttype) {
             let b = match operator.ttype {
                 DoubleEqual => self.wrap(LBool(*l == *r)),
-                BangEqual => self.wrap(LBool(*l == *r)),
+                BangEqual => self.wrap(LBool(*l != *r)),
                 _ => panic!()
             };
             Ok(b)
@@ -340,7 +343,7 @@ impl Interpreter {
 
     fn evaluate_variable(&mut self, name: &Token) -> Result<Rc<RefCell<LObject>>, InterpreterError> {
         match self.env.borrow().resolve(name) {
-            Ok(val) => Ok(val.unwrap()),
+            Ok(val) => Ok(val.unwrap()), // Static analysis should catch uses of uninitialized vars
             Err(lerror) => Err(InterpreterError::from(lerror))
         }
     }

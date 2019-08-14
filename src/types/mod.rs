@@ -8,13 +8,14 @@ use crate::lexing::{Token};
 use crate::errors::LError;
 use crate::types::LTypeError::{TypeError, TypeMismatch, NonFunction, InvalidDeclaration, RequireTypeAnnotation, NonExistentType, NonExistentField, NotGettable, NonExistentDataConstructor, BadPattern};
 use crate::interpreting::LPattern;
+use crate::types::l_types::TypeName;
 
 #[derive(Debug, PartialEq)]
 pub enum LTypeError {
     TypeMismatch(LType, LType, Token, String),
     TypeError(LType, LType, Token, String),
-    NonFunction(LType, Token),
-    NonExistentType(Token),
+    NonFunction(LType, Token, String),
+    NonExistentType(TypeName),
     NonExistentDataConstructor(Token),
     NonExistentField(Token, LType),
     NotGettable(Token, LType),
@@ -29,9 +30,9 @@ impl Display for LTypeError {
             TypeMismatch(l, r, token, note) => write!(f, "{}", LError::from_token(format!("Couldn't match types {} and {}. {}", l, r, note), token)),
             TypeError(l, r, token, note) =>
                 write!(f, "{}", LError::from_token(format!("Expected type {}, got {}. {}", l, r, note), token)),
-            NonFunction(t, token) => write!(f, "{}", LError::from_token(format!("Expected function type, got {}", t), token)),
+            NonFunction(t, token, note) => write!(f, "{}", LError::from_token(format!("Expected function type, got {}. {}", t, note), token)),
             RequireTypeAnnotation(token, note) => write!(f, "{}", LError::from_token(format!("Require type annotation. {}", note), token)),
-            NonExistentType(token) => write!(f, "{}", LError::from_token(format!("Cannot find type {}", token.lexeme), token)),
+            NonExistentType(typename) => write!(f, "{}", LError::from_token(format!("Cannot find type {}", typename), &typename.name)),
             NonExistentField(token, ltype) => write!(f, "{}", LError::from_token(format!("Field {} does not exist on type {}", token.lexeme, ltype), token)),
             InvalidDeclaration => write!(f, "Invalid decl"), // Ok(()) // Caused by cascaded failure, otherwise static analysis would have caught it
             NotGettable(token, ltype) => write!(f, "{}", LError::from_token(format!("{} is not gettable", ltype), token)),

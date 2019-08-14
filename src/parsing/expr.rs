@@ -31,7 +31,7 @@ pub enum Expr {
     EIfLet { token: Token, pattern: LPattern, scrutinee: Box<Expr>, left: Vec<Stmt>, right: Box<Expr> },
     EVariant(String, Vec<Expr>),
     EList(Token, VecDeque<Expr>), // Deque for efficient insertion from both ends
-    ELambda { token: Token, param: LPattern, ltype: Option<LType>, body: Box<Expr> },
+    ELambda { token: Token, param: LPattern, ltype: Option<LType>, body: Box<Expr> }, // Optional type as hopefully type inference will come soon
     EPanic
 }
 

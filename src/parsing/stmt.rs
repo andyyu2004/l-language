@@ -4,11 +4,12 @@ use crate::parsing::Expr;
 use crate::types::LType;
 use crate::lexing::Token;
 use itertools::join;
-use crate::types::l_types::Pair;
+use crate::types::l_types::{Pair, TypeName};
 use crate::parsing::stmt::Stmt::{ExprStmt, LStmt, VarStmt, FnStmt, LetStmt, FnCurried, ReturnStmt, PrintStmt, TypeAlias, WhileStmt, StructDecl, DataDecl};
 use std::collections::HashMap;
 use crate::parsing::expr::format_record;
 use crate::interpreting::LPattern;
+use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
@@ -16,14 +17,14 @@ pub enum Stmt {
     LStmt(Expr), // Expr result not coerced to LUnit like exprstmt
     PrintStmt(Expr),
     WhileStmt { token: Token, condition: Expr, body: Vec<Stmt> },
-    TypeAlias { name: Token, ltype: LType },
+    TypeAlias { name: TypeName, ltype: LType },
     ReturnStmt { token: Token, value: Option<Expr> },
     VarStmt { name: Token, ltype: Option<LType>, init: Option<Expr> },
     LetStmt { token: Token, pattern: LPattern, ltype: Option<LType>, init: Expr },
-    FnStmt { name: Option<String>, token: Token, param: Option<Pair<LType>>, ret_type: LType, body: Vec<Stmt> },
-    StructDecl { name: Token, fields: HashMap<String, LType> },
-    FnCurried { name: Option<String>, token: Token, param: Pair<LType>, ret: Box<Stmt> },
-    DataDecl { name: Token, variants: HashMap<String, LType> },
+    FnStmt { name: Option<String>, token: Token, tparams: Rc<Vec<Token>>, param: Option<Pair<LType>>, ret_type: LType, body: Vec<Stmt> },
+    FnCurried { name: Option<String>, token: Token, tparams: Rc<Vec<Token>>, param: Pair<LType>, ret: Box<Stmt> },
+    StructDecl { name: TypeName, fields: HashMap<String, LType> },
+    DataDecl { name: TypeName, variants: HashMap<String, LType> },
 }
 
 impl Display for Stmt {
@@ -37,12 +38,12 @@ impl Display for Stmt {
             LetStmt { pattern, init, .. } => write!(f, "let {} <- {}", pattern, init),
             WhileStmt { condition, body, .. } => write!(f, "while {} {}", condition, format_block(body)),
 //            CurriedFn(, name, params, ret, body) => write!(f, "fn {} = {} : {} {{\n{}}}", name.lexeme, format_args(params, " => "), ret, format_block(body)),
-            FnStmt { name, param, ret_type, body, .. } => match name {
-                Some(name) => write!(f, "fn {} ({}) -> {} {{{}}}", name, format_option(param), ret_type, format_block(body)),
+            FnStmt { name, param, ret_type, body, tparams, .. } => match name {
+                Some(name) => write!(f, "fn {}<{}> ({}) -> {} {{{}}}", name, join(&**tparams, ", "), format_option(param), ret_type, format_block(body)),
                 None => write!(f, "fn ({}) -> {} {{{}}}",format_option(param), ret_type, format_block(body)),
             }
-            FnCurried { name, param, ret, .. } => match name {
-                Some(name) => write!(f, "cfn {} {} => {}", name, param, ret),
+            FnCurried { name, param, ret, tparams, .. } => match name {
+                Some(name) => write!(f, "cfn {}<{}> {} => {}", name, join(&**tparams, ", "), param, ret),
                 None => write!(f, "cfn {} => {}", param, ret)
             },
             ReturnStmt { value, .. } => match value {
@@ -51,7 +52,8 @@ impl Display for Stmt {
             },
             TypeAlias { name, ltype } => write!(f, "type {} = {}", name, ltype),
             StructDecl { name, fields } => write!(f, "struct {} {{{}}}", name, format_record(fields, ", ")),
-            DataDecl { name, variants } => write!(f, "data {} = {}", name, format_record(variants, " | ")),
+            DataDecl { name, variants } =>
+                write!(f, "data {} = {}", name, format_record(variants, " | ")),
         }
     }
 }
@@ -68,5 +70,5 @@ pub fn format_option<T>(arg: &Option<T>) -> String where T : Display {
 // }
 
 pub fn format_block(statements: &Vec<Stmt>) -> String {
-    join(statements, "; \n")
+    join(statements, "; ")
 }

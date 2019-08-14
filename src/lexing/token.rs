@@ -1,11 +1,25 @@
 use std::fmt::{Display, Error, Formatter};
+use std::hash::{Hash, Hasher};
 
-#[derive(Debug, PartialEq, Clone, Eq)]
+#[derive(Debug, Clone, Eq)]
 pub struct Token {
     pub ttype: TokenType,
     pub lexeme: String,
     pub line: i32,
     pub col: i16
+}
+
+impl Hash for Token {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.ttype.hash(state);
+        self.lexeme.hash(state);
+    }
+}
+
+impl PartialEq for Token {
+    fn eq(&self, other: &Self) -> bool {
+        self.ttype == other.ttype && self.lexeme == other.lexeme
+    }
 }
 
 impl Token {
@@ -45,7 +59,7 @@ impl Display for Token {
 }
 
 // Don't associate values with tokentype, makes parsing more difficult, place data into lexeme field in Token type above
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Hash)]
 pub enum TokenType {
     Plus, Minus, Star, Slash, Caret, Number,
     LParen, RParen, LBrace, RBrace,
@@ -57,7 +71,7 @@ pub enum TokenType {
     Pipe, DoublePipe,
     Ampersand, DoubleAmpersand,
     PlusEqual, MinusEqual, StarEqual, SlashEqual, Modulo, Dollar,
-    Var, Let, Print, Identifier, Fn,
+    Var, Let, Print, Identifier, Fn, TypeVar,
     Comma, Underscore,
     Colon, DoubleColon,
     Return, String,

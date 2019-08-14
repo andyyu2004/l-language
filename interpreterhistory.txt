@@ -1,100 +1,100 @@
-let (Cons x y) = 4;
-data List = Nil | Cons Int List;
-let (Cons x y) = 4;
-let (Cons x y) = Nil;
-let (a,b,c) = 45;;
-let (a,b,c) = 45;
-let x = 5;
-x
-match 5 {}
-match 5 {| 5 -> {5} | 4 -> {}}
-match 5 {| x -> {5} | y -> {}}
-match 5 {| x -> {5} | y -> {5}}
-match 5 {| x -> {5}}
-match 5 {| x -> {5} | y -> {5}}
-match 5 {| x -> {5}}
-if let x = 5 {}
-if let x = 5 {5}
-if let x = 5 {}
-match 5 {| x -> {5} | y -> {5}}
-match 5 {| x -> {5} | y -> {99}}
-match 5 {| x -> {5} | y -> {y}}
-fn map = f: Int -> Int => xs: List { match xs {| Cons x xs -> Cons (f x) (map f xs) | Nil -> Nil}}
-data List = Nil | Cons Int List;
-fn map = f: Int -> Int => xs: List { match xs {| Cons x xs -> Cons (f x) (map f xs) | Nil -> Nil}}
-data List = Nil | Cons Int List;
-fn map = f: Int -> Int => xs: List { match xs {| Cons x xs -> Cons (f x) (map f xs) | Nil -> Nil}}
-{ fn map = f: Int -> Int => xs: List { match xs {| Cons x xs -> Cons (f x) (map f xs) | Nil -> Nil}} }
-data List = Nil | Cons Int List;
-fn map = f: Int -> Int => xs: List {match xs {| Cons x xs -> Cons (f x) (map f xs)| Nil -> Nil}     
-fn map = f: Int -> Int => xs: List {match xs {| Cons x xs -> Cons (f x) (map f xs)| Nil -> Nil}}
-let x = 5;
-x *= 2
-var x = 5;
-x *= 2
-2/4
-let x = 1024
-var x = 1024;
-x /= 2
-\x -> 3
-\x y z-> 3
-\x y z -> 3
-map \x -> x * 2 
-map \x -> x * 2 xs
-map (\x -> x * 2) xs
-if let () = () { "yay"! }
-if let 5 = () { "yay"! }
-if let () = () { "yay"! }
-if let () = 5 { "yay"! }
-if let () = () { "yay"! }
-if let 5 = () { "yay"! }
-if let x  = () { "yay"! }
-if let x = () { "yay"! }
-x
-if let x = () { "yay"! }
-if let () = () { "yay"! }
-if let () = 5 { "yay"! }
-if let 3 = 5 { "yay"! }
-if let 6 = 5 { "yay"! }
-if let 6 = 6 { "yay"! }
-\x -> \y -> 4
-\x -> \y -> x
-let x = \x -> \y -> x;
-let x = \x -> \y -> 5;
-var x = \x -> \y -> 5;
-let x = \x -> \y -> x;
-\x -> \y -> x;
-\x: Int -> \y: Bool -> x;
-\x -> \y -> x;
-\x: Bool -> \y -> x;
-\x: Bool => \y => x;
-\x => \y => x;
-\x:Bool => \y => x;
-\x:Bool => \y: Int => x;
-\x:Bool => \y: Int => x + y;
-\x:Bool => \y: Int => x;
-let f = \x: Int -> x
-let f = \x: Int => x;
+fn f() { 5! }
+let g = f;
+g == f
+let g = f;
+fn f() { 5! }
+let g = f;
+g == f
+fn f<'a, 'b> = x: 'a => y: 'b => z: 'a { x! y! z! }
+let g = f;
+g==f
+let i = g 5;
+let i = g 5 "d";
+let i = g 5 "d"; 4
+fn f = x: 'a => y: 'b => z: 'a { x! y! z! }
+fn f = x: 'a -> 'b => y: 'b => z: 'a { x! y! z! }
 f 5
-let f = \x: Int => x;
+fn f = x: 'a => y: 'b => z: 'a { x! y! z! }
+g 6
+f 6
+fn f = x: 'a => y: 'b => z: 'a { x! y! z! }
+fn f = x: 'a -> 'b => y: 'b => z: 'a { x! y! z! }
+f 6
+fn f = x: 'a -> 'b => y: 'b => z: 'a { x! y! z! }
+f 6
+fn f = x: 'a -> 'b => y: 'b => z: 'a { x! y! z! }
+f 6
+f (\x -> 4)
+f (\x => 4)
+f (\x:Int => 4)
+fn f = x: 'a -> 'b => y: 'b => z: 'a { x! y! z! }
+f (\x:Int => 4)
 f 5
-let f = \x: Int => x;
+fn f = x: 'a -> 'b => y: 'b => z: 'a { x! y! z! }
 f 5
-let f = \x: Int => x;
+fn f = x: 'a -> 'b => y: 'b => z: 'a { x! y! z! }
+f (\x:Int => 4)
+f (\x:Int => \y:Int =>  4)
+f (\x:Int => \y:Int => 4)
+fn f = x: 'a -> 'b => y: 'b => z: 'a { x! y! z! }
+f (\x:Int => \y:Int => 4)
+fn f = x: 'a -> 'b => y: 'b => z: 'a { x! y! z! }
+f (\x:Int => \y:Int => 4)
+fn f = x: 'a -> 'b => y: 'b => z: 'a { x! y! z! }
+f (\x:Int => \y:Int => 4)
+f (\x:Int => 4)
+f (\x:Int => false)
+fn f = x: 'a -> 'b => y: 'b => z: 'a { x! y! z! }
+f (\x:Int => false)
+fn f = x: 'a => y: 'b => z: 'c { x! y! z! }
+fn f = x: 'a => y: 'b => z: 'a { x! y! z! }
 f 5
-let B = F | T;
-data B = F | T;
-let f = \B: Int => x;
-let f = \B: Int => false;
-let f = \x: Int => x;
+fn f = x: 'a => y: 'b => z: 'a { x! y! z! }
+f 5
+f 5 "d"
+f 5 "d" "d"
+f 5 "d" 5
+fn f = x: 'a -> 'b => y: 'b => z: 'a { x! y! z! }
 f 4
-f 88
-let f = \x: Int => \y: Int => x + y
-let f = \x: Int => \y: Int => x + y;
-f 3;
-let add3 = f 3;
-add3 5
-let des = \(a,b,c) : (Int, Int, Int) => {a! b! c!}
-let des = \(a,b,c) : (Int, Int, Int) => {a! b! c!};
-des (1,2,3)
-let add = x: Int => y: Int => x + y;
+f \x: Int => 5
+f (\x: Int => 5)
+fn f = x: 'a -> 'b => y: 'b => z: 'a { x! y! z! }
+f (\x: Int => 5)
+f (\x: Bool => 5)
+f (\x: Bool => Bool)
+f (\x: Bool => false)
+f \x: Bool => Bool
+f \x: Bool => false
+f (\x: Bool => false)
+data List<'a> = Nil | Cons 'a List<'a>
+data List<'a> = Nil | Cons 'a List<'a>;
+Cons 4
+data List<'a> = Nil | Cons 'a List<'a>;
+fn f = x: 'a => y: 'a { x! y! }
+f 4
+f false
+data List<'a> = Nil | Cons 'a List<'a>
+data List<'a> = Nil | Cons 'a List<'a>;
+Cons 5;
+Cons 5 Nil;
+Nil
+[1, "false"]
+let x = []
+let x = [];
+let x: [Int] = [];
+var x: [Int] = [];
+data List<'a> = Nil | Cons 'a List<'a>;
+Cons
+Cons 3
+:tenv
+let icons = Cons 5;
+:tenv
+data List<'a> = Nil | Cons 'a List<'a>;
+Cons
+Cons 4
+data List<'a> = Nil | Cons 'a List<'a>;
+Cons 4
+data List<'a> = Nil | Cons 'a List<'a>;
+Cons 4
+data List<'a> = Nil | Cons 'a List<'a>;
+Cons 4
