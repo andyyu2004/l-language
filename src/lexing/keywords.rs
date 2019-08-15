@@ -29,7 +29,8 @@ impl Keywords {
             "while" => TokenType::While,
             "struct" => TokenType::Struct,
             "data" => TokenType::Data,
-            "match" => TokenType::Match
+            "match" => TokenType::Match,
+            "class" => TokenType::Class
         ]
     }
 }

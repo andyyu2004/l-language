@@ -165,6 +165,8 @@ impl Parser {
             self.parse_struct()
         } else if self.match1(TokenType::Data) {
             self.parse_data()
+//        } else if self.match1(TokenType::Class) {
+//            self.parse_type_class()
         } else {
             self.parse_statement()
         }

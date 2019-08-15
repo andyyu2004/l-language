@@ -97,7 +97,7 @@ pub enum TokenType {
     LSquare, RSquare,
     Dot, DoubleDot,
     If, Else, While, Match,
-    Record, Type, Struct, Data, Typename,
+    Record, Type, Struct, Data, Typename, Class,
     RightArrow, RightFatArrow,
     Nothing
 }

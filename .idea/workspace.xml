@@ -7,15 +7,9 @@
     <list default="true" id="87d7f893-1b77-4ef4-9c5e-a4c1289b1105" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/interpreterhistory.txt" beforeDir="false" afterPath="$PROJECT_DIR$/interpreterhistory.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/lexing/keywords.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/lexing/keywords.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/lexing/token.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/lexing/token.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/types/l_types.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/types/l_types.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/types/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/types/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/types/type_checker.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/types/type_checker.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/utility/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/utility/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/test_scripts/type_parameter_expected.txt" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_scripts/type_parameter_expected.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/test_scripts/type_parameter_output.txt" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_scripts/type_parameter_output.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/test_scripts/type_parameter_tests.l" beforeDir="false" afterPath="$PROJECT_DIR$/tests/test_scripts/type_parameter_tests.l" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/z.txt" beforeDir="false" afterPath="$PROJECT_DIR$/z.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/parsing/parser.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/parsing/parser.rs" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
