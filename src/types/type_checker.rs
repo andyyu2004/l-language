@@ -15,7 +15,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use crate::interpreting::pattern_matching::LPattern;
 use itertools::Itertools;
-use crate::utility::vec_to_map;
+use crate::utility::vec_to_type_map;
 
 pub struct TypeChecker {
     pub env: Rc<RefCell<Env<LType>>>, // Variable -> Type
@@ -107,15 +107,66 @@ impl TypeChecker {
     }
 
     fn type_of_data_decl(&mut self, typename: &TypeName, variants: &mut HashMap<String, LType>) -> Result<LType, LTypeError> {
-        let tdata = TData(typename.name.clone(), vec_to_map(typename.tparams.to_vec()));
+        let tdata = TData(typename.name.clone(), vec_to_type_map(typename.tparams.to_vec()));
 
         self.types.define(typename.name.lexeme.clone(), tdata);
         let mut variants = variants.clone();
+        self.validate_data_declaration(&typename.name, &typename.tparams, &variants)?;
         for (k, v) in &mut variants {
+            // Make sure to do this after the type parameter check, otherwise the error may be incorrectly fixed by the mapping
             v.map_string_to_type_ref(&self.types)?;
             self.env.borrow_mut().define(k.clone(), v.clone())
         }
         Ok(TVariant(variants))
+    }
+
+    // Check the constructor has correct kind AND all type parameters are declared. These checks in conjunction will take care of most scenarios I can think of
+    // Changing the ordering is valid e.g.
+    // List<'a, 'b> = Nil | Cons ('a, 'b) List<'b, 'a>;
+    fn validate_data_declaration(&self, name: &Token, tparams: &Vec<Token>, variants: &HashMap<String, LType>) -> Result<(), LTypeError> {
+        let kind = tparams.len();
+        for (k, v) in variants {
+            // Check for undeclared type variables
+            for p in &v.type_parameters() {
+                if !tparams.contains(p) {
+                    return Err(UndeclaredTypeParameter(p.clone(), format!("All type parameters in ADT definitions must be declared. Help: {}<{}>", name, p)))
+                }
+            }
+//            if v.kinds(name).iter().any(|x| x != kind) {
+            for k in v.kinds(name) {
+                if k != kind {
+                    return Err(BadKind(kind, k, name.clone(), format!("Help: Please ensure the number of type parameters are correct")))
+                }
+            }
+        }
+        Ok(())
+    }
+
+    // Takes a type and makes sure all the types contained within have correct kind
+    fn validate_adt_kind(&self, ltype: &LType) -> Result<(), LTypeError> {
+        match ltype {
+            TData(adt_name, map) => {
+                let adt = match self.types.resolve(adt_name) {
+                    Ok(x) => x,
+                    Err(_) => return Err(NonExistentType(TypeName::new(adt_name.clone(), vec![])))
+                };
+                if let TData(_, tparams) = adt {
+                    let defined_kind = tparams.values().len();
+                    let kind = map.values().len();
+                    if defined_kind != kind {
+                        Err(BadKind(defined_kind, kind, adt_name.clone(), format!("")))
+                    } else { Ok(()) }
+                } else {
+                    panic!()
+                }
+
+            },
+            TArrow(l, r) => {
+                self.validate_adt_kind(l)?;
+                self.validate_adt_kind(r)
+            }
+            _ => Ok(())
+        }
     }
 
     fn type_of_get(&mut self, name: &Token, expr: &mut Expr) -> Result<LType, LTypeError> {
@@ -327,7 +378,7 @@ impl TypeChecker {
 //        }
 //    }
 
-    fn type_of_variable(&mut self, name: &Token) -> Result<LType, LTypeError> {
+    fn type_of_variable(&self, name: &Token) -> Result<LType, LTypeError> {
         match self.env.borrow().resolve(name) {
             Ok(t) => Ok(t),
             Err(_) => {
@@ -559,10 +610,11 @@ impl TypeChecker {
         }
     }
 
-    fn type_of_fn(&mut self, name: &Option<String>, token: &Token, tparams: &Rc<Vec<Token>>, param: &Option<Pair<LType>>, ret: &mut LType, body: &Vec<Stmt>) -> Result<LType, LTypeError> {
+    fn type_of_fn(&mut self, name: &Option<String>, token: &Token, _tparams: &Rc<Vec<Token>>, param: &Option<Pair<LType>>, ret: &mut LType, body: &Vec<Stmt>) -> Result<LType, LTypeError> {
         let prev_ret_type = self.curr_fn_ret_type.clone();
 
         ret.map_string_to_type_ref(&self.types)?; // This is used multiple times below, don't move
+        self.validate_adt_kind(ret)?;
         self.curr_fn_ret_type = Some(ret.clone());
 
         let enclosing = Rc::clone(&self.env);
@@ -571,6 +623,7 @@ impl TypeChecker {
         // Let parameter type be either the type of the parameter or TUnit it no parameter
         let ptype = if let Some(param) = param {
             let t = param.value.clone().map_string_to_type(&self.types)?;
+            self.validate_adt_kind(&t)?;
             self.env.borrow_mut().define(param.name.clone(), t.clone());
             t
         } else { TUnit };
@@ -606,6 +659,7 @@ impl TypeChecker {
         self.env = self.wrap(Env::new(Some(self.env.clone())));
 
         param.value.map_string_to_type_ref(&self.types)?;
+        self.validate_adt_kind(&param.value)?;
         self.env.borrow_mut().define(param.name.clone(), param.value.clone());
 
         // Do this so recursive type checking works

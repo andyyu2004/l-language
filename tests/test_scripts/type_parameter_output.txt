@@ -6,3 +6,4 @@ identity
 printstring
 str
 abc
+(Cons λ PId y -> +{var x}{var y} (Cons λ PId y -> +{var x}{var y} Nil))

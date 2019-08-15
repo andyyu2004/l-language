@@ -12,6 +12,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use std::ops::Deref;
 use crate::main;
+use crate::utility::vec_to_type_map;
 
 #[derive(Clone, Debug)]
 pub struct TypeName {
@@ -63,6 +64,19 @@ pub enum LType {
 
 impl LType {
 
+    // Where name is the name of the ADT we are trying to find the kind of
+    // Vec contains each occurance of the kind of the specified adt
+    pub fn kinds(&self, name: &Token) -> Vec<usize> {
+        match self {
+            TName(typename) => if &typename.name == name {
+                vec![typename.tparams.len()] } else { vec![] },
+            TData(adt_name, map) => if adt_name == name {
+                vec![map.values().len()] } else { vec![] },
+            TArrow(l, r) => l.kinds(name).into_iter().chain(r.kinds(name).into_iter()).collect_vec(),
+            _ => vec![]
+        }
+    }
+
     pub fn type_parameters(&self) -> Vec<Token> {
         match self {
             TVar(token) => vec![token.clone()],
@@ -73,11 +87,12 @@ impl LType {
                 | TVariant(xs) => xs.values().flat_map(|x| x.type_parameters()).collect_vec(),
             TList(xs) => xs.type_parameters(),
             TName(typename) => typename.tparams.clone(),
+            TData(_, map) => map.clone().into_iter().map(|(k, _)| k).collect_vec(),
             _ => vec![]
         }
     }
 
-    // If only one simple type, it remains
+    // If only one simple type, it remains. Used to find the type of a variant. i.e. Cons : Int -> List -> List :: List, Nil : List :: List
     pub fn rightmost_type(&self) -> &Self {
         match self {
             TArrow(_, r) => r.rightmost_type(),
@@ -118,7 +133,12 @@ impl LType {
                 Ok(TRecord(map))
             },
             TName(typename) => match env.resolve(&typename.name) {
-                Ok(t) => Ok(t),
+                Ok(t) => {
+                    match t {
+                        TData(name, _) => Ok(TData(name, vec_to_type_map(typename.tparams))),
+                        t => Ok(t)
+                    }
+                },
                 Err(_) => Err(NonExistentType(typename))
             },
             _ => Ok(self)
@@ -147,7 +167,10 @@ impl LType {
             },
             TName(typename) => match env.resolve(&typename.name) {
                 Ok(t) => {
-                    *self = t;
+                    match t {
+                        TData(name, _) => *self = TData(name, vec_to_type_map(typename.tparams.to_vec())),
+                        _ => *self = t,
+                    };
                     Ok(())
                 },
                 Err(_) => Err(NonExistentType(typename.clone()))
@@ -173,7 +196,7 @@ impl LType {
             (TVariant(xs), TVariant(ys)) =>
                 xs.values().len() == ys.values().len()
                     && xs.values().zip(ys.values()).all(|(x,y)| x.is_type_matchable(y)),
-            
+//            (TData(a, xs), TData(b, ys)) =>
             _ => false
         }
     }
@@ -208,6 +231,20 @@ impl LType {
             TRecord(xs) => TRecord(xs.iter().map(|(k, v)| (k.clone(), v.substitute_type_parameters(tparam, with))).collect()),
             TVariant(xs) => TVariant((xs.iter().map(|(k, v)| (k.clone(), v.substitute_type_parameters(tparam, with)))).collect()),
             TList(xs) => TList(Box::new(xs.substitute_type_parameters(tparam, with))),
+            TData(token, map) => if map.contains_key(tparam) {
+                if let TVar(new_tparam) = with {
+                    // If the substitution is another type parameter, replace
+                    let mut map = map.clone();
+                    map.remove(tparam);
+                    map.insert(new_tparam.clone(), None);
+                    TData(token.clone(), map)
+                } else {
+                    // Else creating a mapping from the type parameter to a concrete type
+                    let mut map = map.clone();
+                    map.insert(tparam.clone(), Some(with.clone()));
+                    TData(token.clone(), map)
+                }
+            } else { self.clone() }
 //            TName(typename) =>
 //            TGeneric(ltype, tparams) => if tparams.contains(tparam) {
 ////                // If generic matches remove generic and substitute
@@ -249,16 +286,48 @@ impl Display for LType {
                 TArrow(_, _) => write!(f, "({}) -> {}", left, right),
                 _                   => write!(f, "{} -> {}", left, right),
             },
-            TData(name, mapping) => write!(f, "{}", name),
+            TData(name, mapping) => write!(f, "{}<{}>", name, format_data(mapping)),
 //            TGeneric(ltype, tparams) => write!(f, "TGeneric<{}> {}", join(tparams, ", "), ltype)
 //                write!(f, "TFunc :: {} sub {:?}", ltype, map)
         }
     }
 }
 
-// Has full equivalence
-impl Eq for LType {}
+// If value is none print the type parameter, else print the concrete type
+fn format_data<K, V>(map: &HashMap<K, Option<V>>) -> String where K : Display, V : Display {
+    let mut acc = String::new();
+    for (i, (k, v)) in map.iter().enumerate() {
+        if i == map.len() - 1 {
+            match v {
+                Some(v) => acc.push_str(&format!("{}", v)),
+                None => acc.push_str(&format!("{}", k))
+            }
+        } else {
+            match v {
+                Some(v) => acc.push_str(&format!("{}, ", v)),
+                None => acc.push_str(&format!("{}, ", k))
+            }
+        }
+    }
+    acc
+}
+
+//pub fn format_option_hashmap<K, V>(map: &HashMap<K, Option<V>>) -> String where K : Display, V : Display {
+//    let mut acc = String::new();
+//    for (i, (k, v)) in map.iter().enumerate() {
+//        if i == map.len() - 1 { acc.push_str(&format!("{}:{}", k, format_option(v))) }
+//        else { acc.push_str(&format!("{}:{}, ", k, format_option(v))) }
+//    }
+//    acc
+//}
 //
+//pub fn format_option<T>(x: &Option<T>) -> String where T : Display {
+//    match x {
+//        Some(x) => format!("{}", x),
+//        None => String::from("None")
+//    }
+//}
+
 //impl PartialEq<Vec<LType>> for LType {
 //    fn eq(&self, other: &Vec<LType>) -> bool {
 //        match (self, other) {
@@ -267,6 +336,7 @@ impl Eq for LType {}
 //        }
 //    }
 //}
+
 
 impl PartialEq for LType {
     fn eq(&self, other: &Self) -> bool {
@@ -288,7 +358,8 @@ impl PartialEq for LType {
             (TTuple(xs), TTuple(ys)) => xs == ys,
             (TTuple(xs), t) => xs.len() == 1 && &xs[0] == t, // Singleton tuple is equivalent to the containing type
             (t, TTuple(ys)) => ys.len() == 1 && &ys[0] == t,
-            (TData(x, _ma), TData(y, _mb)) => x == y,
+            (TData(x, ma), TData(y, mb)) =>
+                eq_data(x, y, ma, mb),
             // Order is not important, but naming is in records
             (TRecord(xs), TRecord(ys)) => xs == ys,
 //                 xs.iter().map(|x| &x.value).collect::<Vec<&LType>>() == ys.iter().map(|y| &y.value).collect::<Vec<&LType>>(),
@@ -296,6 +367,29 @@ impl PartialEq for LType {
             _ => false
         }
     }
+}
+
+// Require ADT<'a> to be equal to any ADT<'x> where 'x is any concrete type
+// E.g. data List<'a> = Nil | Cons 'a List<'a>; Nil has no way of getting a concrete type, should be compatible with any list type
+// Two TData are equal if both fields are equal or
+// Or when ALL mapping that are not equal are due to one being mapped to None
+fn eq_data(a: &Token, b: &Token, x: &HashMap<Token, Option<LType>>, y: &HashMap<Token, Option<LType>>) -> bool {
+    if a == b && x == y { return true; }
+    let mut keys_x = x.keys().collect_vec(); keys_x.sort();
+    let mut keys_y = y.keys().collect_vec(); keys_y.sort();
+    if keys_x != keys_y { return false; }
+
+    for k in keys_x {
+        if x.get(k) == y.get(k) { continue; }
+        // else t != u
+        // If they are both some and they do not equal, then it is because they are of different types
+        // Safely unwrap as we are indexing by their keys
+        if x.get(k).unwrap().is_some() && y.get(k).unwrap().is_some() {
+            return false;
+        }
+    }
+    true
+
 }
 
 #[derive(Debug, Clone, PartialEq)]

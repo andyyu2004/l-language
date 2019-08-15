@@ -6,7 +6,7 @@ pub use l_types::LType;
 use std::fmt::{Display, Formatter, Error};
 use crate::lexing::{Token};
 use crate::errors::LError;
-use crate::types::LTypeError::{TypeError, TypeMismatch, NonFunction, InvalidDeclaration, RequireTypeAnnotation, NonExistentType, NonExistentField, NotGettable, NonExistentDataConstructor, BadPattern};
+use crate::types::LTypeError::*;
 use crate::interpreting::LPattern;
 use crate::types::l_types::TypeName;
 
@@ -21,6 +21,8 @@ pub enum LTypeError {
     NotGettable(Token, LType),
     RequireTypeAnnotation(Token, String),
     BadPattern(LPattern, LType, Token, String),
+    UndeclaredTypeParameter(Token, String),
+    BadKind(usize, usize, Token, String),
     InvalidDeclaration, // When function does not exist, due to definition having failed, don't report error as it is fallthrough
 }
 
@@ -39,6 +41,23 @@ impl Display for LTypeError {
             NonExistentDataConstructor(token) => write!(f, "{}", LError::from_token(format!("Cannot find data constructor {}", token.lexeme), token)),
             BadPattern(pattern, ltype, token, note) =>
                 write!(f, "{}", LError::from_token(format!("Cannot match pattern {} against type {}. {}", pattern, ltype, note), token)),
+            UndeclaredTypeParameter(token, note) =>
+                write!(f, "{}", LError::from_token(format!("Use of undeclared type parameter {}. {}", token, note), token)),
+            BadKind(expected, got, adt, note) =>
+                write!(f, "{}", LError::from_token(format!("{} has kind {}, but got kind {}. {}", adt, format_kind(*expected), format_kind(*got), note), adt))
         }
     }
+}
+
+// Where kind 0 is *, kind 1 is * -> * etc. The number represents the number of type parameters
+fn format_kind(n: usize) -> String {
+    let mut acc = String::new();
+    for i in 0..=n {
+        if i == n {
+            acc.push_str("*")
+        } else {
+            acc.push_str("* -> ")
+        }
+    }
+    acc
 }

@@ -11,7 +11,7 @@ pub mod result;
 //}
 // Can't infer U with only None
 
-pub fn vec_to_map<T>(vec: Vec<T>) -> HashMap<T, Option<LType>> where T : Hash + Eq {
+pub fn vec_to_type_map<T>(vec: Vec<T>) -> HashMap<T, Option<LType>> where T : Hash + Eq {
     let mut map = HashMap::new();
     for x in vec { map.insert(x, None); }
     map

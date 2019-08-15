@@ -1,7 +1,8 @@
-use std::fmt::{Display, Error, Formatter};
+use std::fmt::{Display, Error, Formatter, Debug};
 use std::hash::{Hash, Hasher};
+use std::cmp::Ordering;
 
-#[derive(Debug, Clone, Eq)]
+#[derive(Clone, Eq)]
 pub struct Token {
     pub ttype: TokenType,
     pub lexeme: String,
@@ -16,9 +17,27 @@ impl Hash for Token {
     }
 }
 
+impl Debug for Token {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        write!(f, "{}", self)
+    }
+}
+
 impl PartialEq for Token {
     fn eq(&self, other: &Self) -> bool {
         self.ttype == other.ttype && self.lexeme == other.lexeme
+    }
+}
+
+impl PartialOrd for Token {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.lexeme.partial_cmp(&other.lexeme)
+    }
+}
+
+impl Ord for Token {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.lexeme.cmp(&other.lexeme)
     }
 }
 
