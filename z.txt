@@ -1,10 +1,20 @@
 
+{
+    // This is not allowed currently, but should it be?
+    // If a type parameter is allowed to match any type, type errors may go past unnoticed. 
+    let empty = Nil;
+    match empty {
+        | Cons x xs -> x
+        | Nil -> "List is Nil"
+    } !
+}
+
 // Polymorphic ADTs
 {    
     data List<'a> = Nil | Cons 'a List<'a>;
     let xs = Cons 5 (Cons 6 Nil);
 
-    fn map = f: 'a -> 'b => xs: List<'a> : List<'b, 'a> {
+    fn map = f: 'a -> 'b => xs: List<'a> : List<'b> {
         match xs {
             | Cons x xs -> Cons (f x) (map f xs)
             | Nil -> Nil
@@ -16,5 +26,36 @@
     map (\x: Int => x * 3) xs !
 
     map (\x: Int => x % 2 == 0) xs !
+        
+    
+    fn zipWith = f: 'a -> 'b -> 'c => xs: List<'a> => ys: List<'b> : List<'c> {
+        match (xs, ys) {
+            | (Nil, _) -> Nil
+            | (_, Nil) -> Nil
+            | (Cons x xs, Cons y ys) -> Cons (f x y) (zipWith f xs ys)
+        }
+    }
+
+    zipWith (\x: Int => \y: Int => x + y) (Cons 25 xs) (Cons 0 (Cons 2 (Cons 4 (Cons 6 Nil)))) !
+
+    let listofstrings = Cons "t" Nil;
+    listofstrings !
+    match listofstrings {| Cons x xs -> x| Nil -> "List is Nil"}
+}
+
+{
+    data Tree<'a> = Nil | Node 'a Tree<'a> Tree<'a>;
+
+    data Expr
+        = Abstraction String Expr
+        | Application Expr Expr
+        | Variable String;
+
+    data StrangePairList<'a, 'b> = Nil | Cons 'a 'b StrangePairList<'b, 'a>;
+
+    Cons 0 "zero" (Cons "one" 1 Nil) !
 
 }
+
+
+

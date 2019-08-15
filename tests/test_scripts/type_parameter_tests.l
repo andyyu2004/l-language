@@ -48,4 +48,12 @@
 
     map (\x: Int => \y: Int => x + y) xs !
 
+    // This tests that the types are substituted correctly
+    // I.e. the x is a String not an 'a anymore in the match statement
+    let listofstrings = Cons "correctly substituted" Nil;
+    match listofstrings {
+        | Cons x xs -> x
+        | Nil -> "List is Nil"
+    } !
+
 }

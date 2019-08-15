@@ -36,7 +36,8 @@ impl Display for LTypeError {
             RequireTypeAnnotation(token, note) => write!(f, "{}", LError::from_token(format!("Require type annotation. {}", note), token)),
             NonExistentType(typename) => write!(f, "{}", LError::from_token(format!("Cannot find type {}", typename), &typename.name)),
             NonExistentField(token, ltype) => write!(f, "{}", LError::from_token(format!("Field {} does not exist on type {}", token.lexeme, ltype), token)),
-            InvalidDeclaration => write!(f, "Invalid decl"), // Ok(()) // Caused by cascaded failure, otherwise static analysis would have caught it
+            InvalidDeclaration => write!(f, ""),
+//                write!(f, "Invalid decl"), // Ok(()) // Caused by cascaded failure, otherwise static analysis would have caught it
             NotGettable(token, ltype) => write!(f, "{}", LError::from_token(format!("{} is not gettable", ltype), token)),
             NonExistentDataConstructor(token) => write!(f, "{}", LError::from_token(format!("Cannot find data constructor {}", token.lexeme), token)),
             BadPattern(pattern, ltype, token, note) =>
@@ -50,6 +51,7 @@ impl Display for LTypeError {
 }
 
 // Where kind 0 is *, kind 1 is * -> * etc. The number represents the number of type parameters
+
 fn format_kind(n: usize) -> String {
     let mut acc = String::new();
     for i in 0..=n {

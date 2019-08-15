@@ -12,7 +12,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use std::ops::Deref;
 use crate::main;
-use crate::utility::vec_to_type_map;
+use crate::utility::{vec_to_type_map, vec_to_vec_map, vec_contains_key, vec_replace_key, vec_update_value};
 
 #[derive(Clone, Debug)]
 pub struct TypeName {
@@ -57,7 +57,7 @@ pub enum LType {
     TVariant(HashMap<String, LType>),
     TName(TypeName),
     TVar(Token),
-    TData(Token, HashMap<Token, Option<LType>>), // Token is name, and map is Mapping from type paraneter to concrete type
+    TData(Token, Vec<(Token, Option<LType>)>), // Token is name, Vec is mapping from token/type parameter -> concrete type. Replaced hashmap with vector as ordering is important
 //    TGeneric(Box<LType>, Vec<Token>), // The Tokens represents the type parameter of the argument
     // TNothing
 }
@@ -70,8 +70,8 @@ impl LType {
         match self {
             TName(typename) => if &typename.name == name {
                 vec![typename.tparams.len()] } else { vec![] },
-            TData(adt_name, map) => if adt_name == name {
-                vec![map.values().len()] } else { vec![] },
+            TData(adt_name, params) => if adt_name == name {
+                vec![params.len()] } else { vec![] },
             TArrow(l, r) => l.kinds(name).into_iter().chain(r.kinds(name).into_iter()).collect_vec(),
             _ => vec![]
         }
@@ -135,7 +135,7 @@ impl LType {
             TName(typename) => match env.resolve(&typename.name) {
                 Ok(t) => {
                     match t {
-                        TData(name, _) => Ok(TData(name, vec_to_type_map(typename.tparams))),
+                        TData(name, _) => Ok(TData(name, vec_to_vec_map(typename.tparams.clone()))),
                         t => Ok(t)
                     }
                 },
@@ -168,7 +168,7 @@ impl LType {
             TName(typename) => match env.resolve(&typename.name) {
                 Ok(t) => {
                     match t {
-                        TData(name, _) => *self = TData(name, vec_to_type_map(typename.tparams.to_vec())),
+                        TData(name, _) => *self = TData(name, vec_to_vec_map(typename.tparams.clone())),
                         _ => *self = t,
                     };
                     Ok(())
@@ -231,17 +231,16 @@ impl LType {
             TRecord(xs) => TRecord(xs.iter().map(|(k, v)| (k.clone(), v.substitute_type_parameters(tparam, with))).collect()),
             TVariant(xs) => TVariant((xs.iter().map(|(k, v)| (k.clone(), v.substitute_type_parameters(tparam, with)))).collect()),
             TList(xs) => TList(Box::new(xs.substitute_type_parameters(tparam, with))),
-            TData(token, map) => if map.contains_key(tparam) {
+            TData(token, map) => if vec_contains_key(tparam, map) {
                 if let TVar(new_tparam) = with {
-                    // If the substitution is another type parameter, replace
-                    let mut map = map.clone();
-                    map.remove(tparam);
-                    map.insert(new_tparam.clone(), None);
+                    // If the substitution is another type parameter, replace instead of substituting it as a value
+                    let mut map = map.to_vec();
+                    vec_replace_key(tparam, new_tparam.clone(), &mut map);
                     TData(token.clone(), map)
                 } else {
                     // Else creating a mapping from the type parameter to a concrete type
-                    let mut map = map.clone();
-                    map.insert(tparam.clone(), Some(with.clone()));
+                    let mut map = map.to_vec();
+                    vec_update_value(tparam, Some(with.clone()), &mut map);
                     TData(token.clone(), map)
                 }
             } else { self.clone() }
@@ -294,7 +293,7 @@ impl Display for LType {
 }
 
 // If value is none print the type parameter, else print the concrete type
-fn format_data<K, V>(map: &HashMap<K, Option<V>>) -> String where K : Display, V : Display {
+fn format_data<K, V>(map: &Vec<(K, Option<V>)>) -> String where K : Display, V : Display {
     let mut acc = String::new();
     for (i, (k, v)) in map.iter().enumerate() {
         if i == map.len() - 1 {
@@ -373,22 +372,40 @@ impl PartialEq for LType {
 // E.g. data List<'a> = Nil | Cons 'a List<'a>; Nil has no way of getting a concrete type, should be compatible with any list type
 // Two TData are equal if both fields are equal or
 // Or when ALL mapping that are not equal are due to one being mapped to None
-fn eq_data(a: &Token, b: &Token, x: &HashMap<Token, Option<LType>>, y: &HashMap<Token, Option<LType>>) -> bool {
-    if a == b && x == y { return true; }
-    let mut keys_x = x.keys().collect_vec(); keys_x.sort();
-    let mut keys_y = y.keys().collect_vec(); keys_y.sort();
-    if keys_x != keys_y { return false; }
+// Need to also consider alpha equivalence
+fn eq_data(a: &Token, b: &Token, xs: &Vec<(Token, Option<LType>)>, ys: &Vec<(Token, Option<LType>)>) -> bool {
+    if a == b && xs == ys { return true; }
+    // If all values match in order
+//    if a == b &&
+//        xs.iter()
+//            .map(|(x,y)| y).
+//            zip(ys.iter()
+//            .map(|(x,y)| y))
+//            .all(|(x,y)| x == y) { return true; }
+    let xvalues = xs.iter().map(|(x,y)| y).collect_vec();
+    let yvalues = ys.iter().map(|(x,y)| y).collect_vec();
 
-    for k in keys_x {
-        if x.get(k) == y.get(k) { continue; }
-        // else t != u
-        // If they are both some and they do not equal, then it is because they are of different types
-        // Safely unwrap as we are indexing by their keys
-        if x.get(k).unwrap().is_some() && y.get(k).unwrap().is_some() {
-            return false;
-        }
+    for (x, y) in xvalues.iter().zip(yvalues) {
+        // If they are not equal and neither of them is a None (i.e. still a parameter) then they are not equal
+        if x != &y && x.is_some() && y.is_some() { return false; }
     }
+
     true
+//    Old hashmap implementation
+//    let mut keys_x = x.keys().collect_vec(); keys_x.sort();
+//    let mut keys_y = y.keys().collect_vec(); keys_y.sort();
+//    if keys_x != keys_y { return false; }
+//
+//    for k in keys_x {
+//        if x.get(k) == y.get(k) { continue; }
+//        // else t != u
+//        // If they are both some and they do not equal, then it is because they are of different types
+//        // Safely unwrap as we are indexing by their keys
+//        if x.get(k).unwrap().is_some() && y.get(k).unwrap().is_some() {
+//            return false;
+//        }
+//    }
+//    true
 
 }
 

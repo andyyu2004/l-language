@@ -15,7 +15,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use crate::interpreting::pattern_matching::LPattern;
 use itertools::Itertools;
-use crate::utility::vec_to_type_map;
+use crate::utility::{vec_to_type_map, vec_to_vec_map};
 
 pub struct TypeChecker {
     pub env: Rc<RefCell<Env<LType>>>, // Variable -> Type
@@ -107,7 +107,7 @@ impl TypeChecker {
     }
 
     fn type_of_data_decl(&mut self, typename: &TypeName, variants: &mut HashMap<String, LType>) -> Result<LType, LTypeError> {
-        let tdata = TData(typename.name.clone(), vec_to_type_map(typename.tparams.to_vec()));
+        let tdata = TData(typename.name.clone(), vec_to_vec_map(typename.tparams.to_vec()));
 
         self.types.define(typename.name.lexeme.clone(), tdata);
         let mut variants = variants.clone();
@@ -151,8 +151,8 @@ impl TypeChecker {
                     Err(_) => return Err(NonExistentType(TypeName::new(adt_name.clone(), vec![])))
                 };
                 if let TData(_, tparams) = adt {
-                    let defined_kind = tparams.values().len();
-                    let kind = map.values().len();
+                    let defined_kind = tparams.len();
+                    let kind = map.len();
                     if defined_kind != kind {
                         Err(BadKind(defined_kind, kind, adt_name.clone(), format!("")))
                     } else { Ok(()) }
@@ -299,7 +299,9 @@ impl TypeChecker {
         let tleft = self.type_of_block(left, Rc::new(RefCell::new(env)))?;
         let tright = self.type_of_expr(right)?;
         if tleft != tright { return Err(TypeMismatch(tleft, tright, token.clone(), "All branches must have the same return type".into())) }
-        Ok(tright)
+        // It is important this is left not right. Otherwise typechecking match statements will pass even if branches have different types due to the right having type TTop and this
+        // propogates upwards allowing bogus typing.
+        Ok(tleft)
     }
 
 //    if let Some(ref p) = **p {
@@ -312,21 +314,29 @@ impl TypeChecker {
     fn type_of_pattern_bindings(&self, token: &Token, pattern: &LPattern, ltype: &LType) -> Result<Vec<(String, LType)>, LTypeError> {
         match pattern {
             PVariant(name, p) => if let Some(p) = p {
-                let constructor_type = match self.env.borrow().resolve(name) {
+                let mut constructor_type = match self.env.borrow().resolve(name) {
                     Ok(x) => x,
                     Err(_) => return Err(NonExistentDataConstructor(name.clone()))
                 };
-//                println!("ctype: {}", ltype);
-//                let constructor_type =
-//                    if let TArrow(l, _) = constructor { *l }
-//                    else { ltype.clone() };
-//                println!("ctype': {}", constructor_type);
                 let adt_type = constructor_type.rightmost_type();
+
                 if  adt_type != ltype {
                     return Err(TypeError(adt_type.clone(), ltype.clone(), token.clone(),
                          format!("The constructor {} belongs to data type {}. Attempting to pattern match this constructor against {}", name, adt_type, ltype))
                     )
                 }
+
+                // Need to substitute the concrete types into the constructor type. e.g. ctype = 'a -> List<'a> -> List<'a>, but ltype is of List<String>
+                // Then the constructor type should become String -> List<String> -> List<String>
+                if let TData(_, substitutions) = ltype {
+                    // Does substituting by name directly always, always work?
+                    for (k, v) in substitutions {
+                        if let Some(v) = v {
+                            constructor_type = constructor_type.substitute_type_parameters(k, v)
+                        }
+                    }
+                }
+
                 // Remove the rightmost as the rightmost type is the type of the adt itself, and we don't want to match that
                 // Remove rightmost will always work without panic because if it is a simple type then there is no pattern and the if let Some will fail and skip this block
                 self.type_of_pattern_bindings(name, p, &constructor_type.remove_rightmost())
@@ -347,12 +357,17 @@ impl TypeChecker {
                     if xs.len() != ts.len() {
                         return Err(BadPattern(pattern.clone(), ltype.clone(), token.clone(), format!("Pattern matches a {}-tuple, got {}-tuple", xs.len(), ts.len())))
                     }
-                    Ok(xs.iter()
-                        .zip(ts)
-                        .flat_map(|(p, x)| self.type_of_pattern_bindings(token, p, x))
-                        .flatten() // flatmap doesn't leave it very flat for some reason
-                        .collect_vec()
-                    )
+                    let mut v = vec![];
+                    for (p, x) in xs.iter().zip(ts) {
+                        v.append(&mut self.type_of_pattern_bindings(token, p, x)?)
+                    }
+                    Ok(v)
+//                    Ok(xs.iter()
+//                        .zip(ts)
+//                        .flat_map(|(p, x)| self.type_of_pattern_bindings(token, p, x))
+//                        .flatten()
+//                        .collect_vec()
+//                    )
                 } else {
                     Err(BadPattern(pattern.clone(), ltype.clone(), token.clone(), format!("Note: Cannot match tuple pattern against non-tuple")))
                 }
@@ -382,7 +397,7 @@ impl TypeChecker {
         match self.env.borrow().resolve(name) {
             Ok(t) => Ok(t),
             Err(_) => {
-                println!("Couldn't find variable {}", name);
+                println!("Couldn't find variable {} (Typechecker)", name);
                 Err(InvalidDeclaration)
             } // If variable is not found here it is due to bad types in declaration
         }

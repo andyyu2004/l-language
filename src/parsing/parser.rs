@@ -483,7 +483,7 @@ impl Parser {
                 return Ok(PTuple(self.parse_tuple(&Parser::parse_pattern)?))
             }
             pattern
-        } else if self.r#match(&[TokenType::Number, TokenType::String]) {
+        } else if self.r#match(&[TokenType::Number, TokenType::String, TokenType::False, TokenType::True]) {
             Ok(PLiteral(self.previous().clone()))
         } else {
             Err(LError::from_token("Bad pattern".to_string(), self.current()))

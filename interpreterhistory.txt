@@ -1,37 +1,3 @@
-f 5
-data List<'a> = Nil | Cons 'a List<'a>
-data List<'a> = Nil | Cons 'a List<'a>;
-Cons 
-Cons 5
-Cons 
-data List<'a> = Nil | Cons 'a List<'a>;
-Cons
-Cons 5
-Cons "er"
-data List<'a> = Nil | Cons 'a List<'a>;
-Cons "er"
-Cons 5
-Cons 5 (Cons "f" Nil)
-Cons 5
-let i = Cons 5
-let i = Cons 5;
-let s = Cons "t";
-i == t
-i == s
-i == i
-i
-i == i
-i
-let i = Cons 5;
-i (Cons 7 Nil)
-i (Cons "e" Nil)
-data List<'a> = Nil | Cons 'a List<'a>;
-let i = Cons 5;
-i (Cons "e" Nil)
-let i = Cons 5;
-data List<'a> = Nil | Cons 'a List<'a>;
-let i = Cons 5;
-i (Cons "e" Nil)
 data List = Nil | Cons 'a List
 data List = Nil | Cons 'a List;
 Cons 1 (Cons 2 Nil)
@@ -98,3 +64,37 @@ fn identity(x: 'a) -> 'a' { x }
 fn identity(x: 'a) -> 'a { x }
 identity 5
 identity "stt"
+data Boolean = False | True;
+False
+data List<'a> = Nil | Cons 'a List<'a>;
+let listofstrings = Cons "t" Nil;
+match listofstrings {| Cons x xs -> x| Nil -> "List is Nil"}
+data List<'a> = Nil | Cons 'a List<'a>;
+let listofstrings = Cons "t" Nil;
+:tenv
+if let false = false { 4! }
+if let false = true { 4! }
+if let 5 = 5 { 4! }
+let _ = 5;
+_
+let _ = 5;
+:tenv
+let _ = 5;
+fn recurse(n: Int) { n! recurse(n+1) }
+recurse(0)
+fn fib(n: Int) -> Int { if n < 2 { 1 } else { n + fib(n-1) } }
+fib 1000
+fib 1400
+fib 1300
+fib 1400
+fn fib(n: Int) -> Int { if n < 2 { 1 } else { n + fib(n-1) } }
+fib 1400
+fib 1300
+fn fib(n: Int) -> Int { if n < 2 { 1 } else { n + fib(n-1) } }
+fib 1300
+fn fib(n: Int) -> Int { if n < 2 { 1 } else { n + fib(n-1) } }
+fib 1200
+fn fib(n: Int) -> Int { if n < 2 { 1 } else { n + fib(n-1) } }
+fib 1100
+fn fib(n: Int) -> Int { if n < 2 { 1 } else { n + fib(n-1) } }
+fib 1200
