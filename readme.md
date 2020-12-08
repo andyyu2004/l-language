@@ -1,5 +1,8 @@
 # L
 
+Please refer to `https://github.com/andyyu2004/l-lang` for the newer implementation of L.
+
+
 This project can be built and run using cargo.
 
 **Syntax**
