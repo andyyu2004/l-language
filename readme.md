@@ -1,6 +1,6 @@
 # L
 
-Please refer to `https://github.com/andyyu2004/l-lang` for the newer implementation of L.
+Please refer to [here](https://github.com/andyyu2004/l-lang) for a newer and more complete implementation of L. Note, the language has changed drastically from this point in time.
 
 
 This project can be built and run using cargo.
